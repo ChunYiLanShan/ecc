@@ -40,3 +40,5 @@ exe_sql('SELECT * FROM hqliss1.EQ_EQUIP_TYPE WHERE ROWNUM < 1000');
 exe_sql('SELECT * FROM hqliss1.RTM_CONTROLDATA');
 exe_sql("""SELECT equip_name, EQUIP_ID, EQUIP_TYPE_ID FROM hqliss1.EQ_EQUIP WHERE EQUIP_ID = 21719""")
 exe_sql("""SELECT EQUIP_ID, EQUIP_TYPE_ID FROM hqliss1.EQ_EQUIP WHERE equip_name = '门诊楼B1层低配间A1L31柜螺杆机3号PE410R'""")
+
+connection.close()

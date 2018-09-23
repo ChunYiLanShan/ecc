@@ -1,3 +1,5 @@
 venv
 .idea
+*.log
+instantclient_18_3
 connection_info.sh

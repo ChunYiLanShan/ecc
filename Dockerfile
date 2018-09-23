@@ -5,6 +5,8 @@ ENV LD_LIBRARY_PATH '/opt/app/instantclient_18_3'
 RUN apt update
 RUN apt install libaio1
 RUN apt install -y mysql-client
+# DEBUG?
+RUN apt install -y vim
 # sudo apt-get install python-pip python-dev build-essential ?
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
