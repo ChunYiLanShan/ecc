@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import datetime
+from datetime import datetime
 import mysql.connector
 import logging
 import os
@@ -26,6 +26,10 @@ class MySqlAdatper(object):
         self.user = user
         self.password = password
         self.db_name = db_name
+        self.db_conn = mysql.connector.connect(user=self.user, password=self.password,
+                              host=self.host,
+                              database=self.db_name)
+
 
 
     def get_all_equip_names(self):
@@ -50,8 +54,33 @@ class MySqlAdatper(object):
         cnx.close()
         return names
 
-    def insert_energy_point_data(self):
-        pass
+    def insert_energy_point_data(self, equip_energy_data):
+        add_energy = ("INSERT INTO energymanage_electricity_circuit_monitor_data"
+                      "(voltage_A, voltage_B, voltage_C, current_A, current_B, current_C, quantity, power, time, circuit_id) "
+                                    "VALUES (%(voltage_A)s, %(voltage_B)s, %(voltage_C)s, %(current_A)s, %(current_B)s, %(current_C)s, %(quantity)s, %(power)s, %(time)s,%(circuit_id)s)")
+        sql = ''
+        data_energy = {
+                'voltage_A': equip_energy_data.voltage_A,
+                'voltage_B': equip_energy_data.voltage_B,
+                'voltage_C': equip_energy_data.voltage_C,
+                'current_A': equip_energy_data.current_A,
+                'current_B': equip_energy_data.current_B,
+                'current_C': equip_energy_data.current_C,
+                'quantity': equip_energy_data.quatity,
+                'power': equip_energy_data.power,
+                'time': datetime.now(),
+                'circuit_id': equip_energy_data.mysql_equip_id
+        }
+        cursor = self.db_conn.cursor()
+
+        cursor.execute(add_energy, data_energy)
+
+        # Make sure data is committed to the database
+        self.db_conn.commit()
+
+        cursor.close()
+    def clear(self):
+        self.db_conn.close()
         
 
 class EquipEnergyData(object):
@@ -121,6 +150,7 @@ class OracleAdapter(object):
         equip_data = EquipEnergyData()
         equip_data.mysql_equip_id = mysql_equip_id
         equip_data.name = name
+        equip_data.oracle_equip_id = '%s.%s' % (equip_keys['type'], equip_keys['id'])
         for point in result:
             setattr(equip_data, point['point_type'], point['point_value'])
         return equip_data
@@ -256,7 +286,9 @@ def collect():
         logger.debug('Collect data for equipment:%s', index)
         equip_energy_data = oracle_adapter.get_data_for_equip(index['name'], index['id'])
         print equip_energy_data
+        mysqladapter.insert_energy_point_data(equip_energy_data)
     oracle_adapter.clear()
+    mysqladapter.clear()
 
 if __name__ == '__main__':
     collect()
