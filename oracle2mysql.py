@@ -90,10 +90,59 @@ class OracleAdapter(object):
         pass
         equip_keys = self.get_equip_id_and_type(name)
         logger.info(equip_keys)
+        self.get_rtm_point_ids(equip_keys['id'], equip_keys['type'])
+
+    def _rows_to_dict_list(self, cursor):
+        columns = [i[0] for i in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor]
+
+    def get_rtm_point_ids(self, equip_id, equip_type):
+        '''
+        有功功率
+        有功功耗
+        A相电压
+        B相电压
+        C相电压
+        A相电流
+        B相电流
+        C相电流
+        '''
+        equip_no = '%s.%s' % (str(equip_type), str(equip_id))
+        sql = """SELECT point_id, point_name, short_code, depict,equip_no FROM hqliss1.RTM_POINT WHERE equip_no = '%s'""" % equip_no
+        print '#'* 50
+        def map_row_to_mysql_data(row_map):
+            reuslt = {
+                'voltage_A':'',
+                'voltage_B':'',
+                'voltage_C':'',
+                'current_A':'',
+                'current_B':'',
+                'current_C':'',
+                'power':'',
+                'quantity':''
+            }
+
+            voltage_a = u'A相电压'
+            if row_map['POINT_NAME'] == voltage_a or voltage_a in row_map['DEPICT']:
+                result['voltage_A']
+
+            
+        try:
+            cursor = self.connection.cursor()
+            i = 0
+            cursor.execute(sql)
+            result = {}
+            row_dict = self._rows_to_dict_list(cursor)
+            for row_map in row_dict:
+                map_row_to_mysql_data(row_map)
+        finally:
+            cursor.close()
+
 
 
     def get_equip_id_and_type(self, name):
         sql = """SELECT EQUIP_ID, EQUIP_TYPE_ID FROM hqliss1.EQ_EQUIP WHERE equip_name = '%s'""" % name
+
 
         try:
             cursor = self.connection.cursor()
