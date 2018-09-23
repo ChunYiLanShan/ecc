@@ -91,14 +91,29 @@ class OracleAdapter(object):
         equip_keys = self.get_equip_id_and_type(name)
         logger.info(equip_keys)
         result = self.get_rtm_point_ids(equip_keys['id'], equip_keys['type'])
-        for x in result:
-            print x
-            for k, v in x.items():
+        for point in result:
+            # Get point current value
+            point_value = self._get_point_val_from_rtm_controldata(point['point_id'])
+            point['point_value'] = point_value
+        print '**' * 50
+        for point in result:
+            for k,v in point.items():
                 print k,v
 
     def _rows_to_dict_list(self, cursor):
         columns = [i[0] for i in cursor.description]
         return [dict(zip(columns, row)) for row in cursor]
+
+    def _get_point_val_from_rtm_controldata(self, point_id):
+        sql = """SELECT * FROM hqliss1.RTM_CONTROLDATA WHERE POINT_ID = '%s'""" % point_id
+        try:
+            cursor = self.connection.cursor()
+            i = 0
+            cursor.execute(sql)
+            rows_map = self._rows_to_dict_list(cursor)
+            return rows_map[0]['RECORD']
+        finally:
+            cursor.close()
 
     def get_rtm_point_ids(self, equip_id, equip_type):
         '''
