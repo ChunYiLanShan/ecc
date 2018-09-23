@@ -106,6 +106,11 @@ class OracleAdapter(object):
         A相电流
         B相电流
         C相电流
+
+        return:
+            [ {'point_id':'', 'point_type':'xx'}, ... ]
+            point_type: voltage_A,voltage_B, ...
+            
         '''
         equip_no = '%s.%s' % (str(equip_type), str(equip_id))
         sql = """SELECT point_id, point_name, short_code, depict,equip_no FROM hqliss1.RTM_POINT WHERE equip_no = '%s'""" % equip_no
@@ -124,7 +129,7 @@ class OracleAdapter(object):
 
             voltage_a = u'A相电压'
             if row_map['POINT_NAME'] == voltage_a or voltage_a in row_map['DEPICT']:
-                result['voltage_A']
+                pass
 
             
         try:
@@ -137,7 +142,6 @@ class OracleAdapter(object):
                 map_row_to_mysql_data(row_map)
         finally:
             cursor.close()
-
 
 
     def get_equip_id_and_type(self, name):
