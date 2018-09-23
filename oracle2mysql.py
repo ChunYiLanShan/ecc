@@ -90,7 +90,11 @@ class OracleAdapter(object):
         pass
         equip_keys = self.get_equip_id_and_type(name)
         logger.info(equip_keys)
-        self.get_rtm_point_ids(equip_keys['id'], equip_keys['type'])
+        result = self.get_rtm_point_ids(equip_keys['id'], equip_keys['type'])
+        for x in result:
+            print x
+            for k, v in x.items():
+                print k,v
 
     def _rows_to_dict_list(self, cursor):
         columns = [i[0] for i in cursor.description]
@@ -115,31 +119,64 @@ class OracleAdapter(object):
         equip_no = '%s.%s' % (str(equip_type), str(equip_id))
         sql = """SELECT point_id, point_name, short_code, depict,equip_no FROM hqliss1.RTM_POINT WHERE equip_no = '%s'""" % equip_no
         print '#'* 50
-        def map_row_to_mysql_data(row_map):
-            reuslt = {
-                'voltage_A':'',
-                'voltage_B':'',
-                'voltage_C':'',
-                'current_A':'',
-                'current_B':'',
-                'current_C':'',
-                'power':'',
-                'quantity':''
-            }
+        voltage_a_str = u'A相电压'
+        voltage_b_str = u'B相电压'
+        voltage_c_str = u'C相电压'
+        current_a_str = u'A相电流'
+        current_b_str = u'B相电流'
+        current_c_str = u'C相电流'
+        power_str = u'有功功率'
+        quatity_str = u'有功功耗'
+        mysql_col_name_to_chinese_str = {
+            'voltage_A':voltage_a_str,
+            'voltage_B':voltage_b_str,
+            'voltage_C':voltage_c_str,
+            'current_A':current_a_str,
+            'current_B':current_b_str,
+            'current_C':current_c_str,
+            'power':power_str,
+            'quantity':quatity_str
+        }
+        def to_id_type_map(row_map):
+            '''
+            return {'point_id':'', 'point_type':''}
+            '''
 
-            voltage_a = u'A相电压'
-            if row_map['POINT_NAME'] == voltage_a or voltage_a in row_map['DEPICT']:
-                pass
+            point_name = row_map['POINT_NAME'] 
+            depict = row_map['DEPICT']
+            key_point_id = 'point_id'
+            key_point_type = 'point_type'
+            point_id_val = row_map['POINT_ID']
+
+            for  k,v in mysql_col_name_to_chinese_str.items():
+                if point_name == v or v in depict:
+                    return {key_point_id:point_id_val, key_point_type:k}
+            logger.warn('Not found valid point type. row map is %s', row_map)
+            for k,v in row_map.items():
+                print k,v
 
             
         try:
+            result = []
             cursor = self.connection.cursor()
             i = 0
             cursor.execute(sql)
-            result = {}
             row_dict = self._rows_to_dict_list(cursor)
             for row_map in row_dict:
-                map_row_to_mysql_data(row_map)
+                id_type_map_result = to_id_type_map(row_map)
+                if id_type_map_result is not None:
+                    result.append(id_type_map_result)
+            #validate result: make sure there are
+            required_cols = mysql_col_name_to_chinese_str.keys()
+            cols = []
+            for x in result:
+                cols.append(x['point_type'])
+            for required_col in required_cols:
+                if required_col not in cols:
+                    logger.error('Not found required type: %s', required_col)
+                    raise Exception('Not found required type: %s' % required_col)
+                
+            return result
         finally:
             cursor.close()
 
