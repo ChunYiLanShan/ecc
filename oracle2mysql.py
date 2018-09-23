@@ -6,6 +6,9 @@ import logging
 import os
 import sys
 
+#oracle
+import cx_Oracle
+
 logger = logging.getLogger()
 handler = logging.StreamHandler()
 formatter = logging.Formatter(
@@ -62,6 +65,14 @@ class OracleAdapter(object):
         self.host=os.environ['ORACLE_HOST']
         self.port=os.environ['ORACLE_PORT']
         self.orcl_inst=os.environ['ORACLE_INSTANCE']
+
+        # select chinese
+        os.environ["NLS_LANG"] = "American_America.ZHS16GBK"
+        # where chinese
+        os.environ["NLS_LANG"] = "AMERICAN_AMERICA.UTF8"
+        # Connect as user "hr" with password "welcome" to the "oraclepdb" service running on this computer.
+        self.connection = cx_Oracle.connect(self.user, self.password, "%s:%s/%s" % (self.host, self.port, self.orcl_inst))
+
     def _exe_sql(self, cursor, sql):
         print '#'*100
         print sql
@@ -77,22 +88,29 @@ class OracleAdapter(object):
 
     def get_data_for_equip(self,name):
         pass
-        import cx_Oracle
+        equip_keys = self.get_equip_id_and_type(name)
+        logger.info(equip_keys)
 
-        # select chinese
-        os.environ["NLS_LANG"] = "American_America.ZHS16GBK"
-        # where chinese
-        os.environ["NLS_LANG"] = "AMERICAN_AMERICA.UTF8"
 
-          
-        # Connect as user "hr" with password "welcome" to the "oraclepdb" service running on this computer.
-        connection = cx_Oracle.connect(self.user, self.password, "%s:%s/%s" % (self.host, self.port, self.orcl_inst))
-
+    def get_equip_id_and_type(self, name):
         sql = """SELECT EQUIP_ID, EQUIP_TYPE_ID FROM hqliss1.EQ_EQUIP WHERE equip_name = '%s'""" % name
 
-        cursor = connection.cursor()
-        self._exe_sql(cursor, sql)
-        connection.close()
+        try:
+            cursor = self.connection.cursor()
+            i = 0
+            cursor.execute(sql)
+            result = {}
+            for x in cursor:
+                i += 1
+                print x
+                result ={'id':x[0], 'type':x[1]}
+            assert i == 1
+            return result
+        finally:
+            cursor.close()
+
+    def clear(self):
+        self.connection.close()
 
 
 def collect():
@@ -109,6 +127,7 @@ def collect():
     for index in indexes[:10]:
         logger.debug('Collect data for equipment:%s', index)
         oracle_adapter.get_data_for_equip(index['name'])
+    oracle_adapter.clear()
 
 
 
