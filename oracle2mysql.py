@@ -166,9 +166,6 @@ class OracleAdapter(object):
             for  k,v in mysql_col_name_to_chinese_str.items():
                 if point_name == v or v in depict:
                     return {key_point_id:point_id_val, key_point_type:k}
-            logger.warn('Not found valid point type. row map is %s', row_map)
-            for k,v in row_map.items():
-                print k,v
 
             
         try:
@@ -233,10 +230,6 @@ def collect():
         logger.debug('Collect data for equipment:%s', index)
         oracle_adapter.get_data_for_equip(index['name'])
     oracle_adapter.clear()
-
-
-
-    
 
 if __name__ == '__main__':
     collect()
