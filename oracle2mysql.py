@@ -49,7 +49,27 @@ class MySqlAdatper(object):
         cursor.close()
         cnx.close()
         return names
+
+    def insert_energy_point_data(self):
+        pass
         
+
+class EquipEnergyData(object):
+    def __init__(self):
+        self.mysql_equip_id = None
+        self.oracle_equip_id = None
+        self.name = None
+        self.voltage_A = None
+        self.voltage_B = None
+        self.voltage_C = None
+        self.current_A = None
+        self.current_B = None
+        self.current_C = None
+        self.quatity = None
+        self.power = None 
+    def __str__(self):
+        return str(self.__dict__)
+
 
 class OracleAdapter(object):
 
@@ -86,8 +106,10 @@ class OracleAdapter(object):
                 sys.stdout.write('--')
             sys.stdout.write('\n')
 
-    def get_data_for_equip(self,name):
-        pass
+    def get_data_for_equip(self, name, mysql_equip_id):
+        '''
+        EngeryPoint, {}, ...]
+        '''
         equip_keys = self.get_equip_id_and_type(name)
         logger.info(equip_keys)
         result = self.get_rtm_point_ids(equip_keys['id'], equip_keys['type'])
@@ -96,9 +118,13 @@ class OracleAdapter(object):
             point_value = self._get_point_val_from_rtm_controldata(point['point_id'])
             point['point_value'] = point_value
         print '**' * 50
+        equip_data = EquipEnergyData()
+        equip_data.mysql_equip_id = mysql_equip_id
+        equip_data.name = name
         for point in result:
-            for k,v in point.items():
-                print k,v
+            setattr(equip_data, point['point_type'], point['point_value'])
+        return equip_data
+
 
     def _rows_to_dict_list(self, cursor):
         columns = [i[0] for i in cursor.description]
@@ -228,7 +254,8 @@ def collect():
     oracle_adapter = OracleAdapter()
     for index in indexes[:10]:
         logger.debug('Collect data for equipment:%s', index)
-        oracle_adapter.get_data_for_equip(index['name'])
+        equip_energy_data = oracle_adapter.get_data_for_equip(index['name'], index['id'])
+        print equip_energy_data
     oracle_adapter.clear()
 
 if __name__ == '__main__':
