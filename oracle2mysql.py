@@ -560,8 +560,12 @@ def test_get_equip_engery_data_in_batch():
     oracle_adapter.clear()
 
 if __name__ == '__main__':
+    secs=5*60
+    if 'ECC_DURATION' in os.environ:
+        secs = int(os.environ['ECC_DURATION'])
+    logger.info('Duration setting is %s', secs)
+    
     while True:
-        secs=5*60
         logger.info('Sleep %s seconds for next run', secs)
         time.sleep(secs)
         collect()
