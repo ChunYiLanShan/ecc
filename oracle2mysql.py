@@ -353,11 +353,27 @@ class OracleAdapter(object):
         finally:
             cursor.close()
 
-    def get_point_id_to_value(point_id_list):
+    def get_point_id_to_value(self, point_id_list):
         '''
         return {'point_id':'value', ... }
         '''
-        pass
+        point_ids_sql = ','.join(map(lambda e : "'%s'" % e, point_id_list))
+        sql = """SELECT POINT_ID, RECORD FROM hqliss1.RTM_CONTROLDATA WHERE POINT_ID IN (%s)""" % point_ids_sql 
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(sql)
+            result = {}
+            rows_list = self._rows_to_dict_list(cursor)
+            for row_dict in rows_list:
+                point_value = row_dict['RECORD']
+                point_id = row_dict['POINT_ID']
+                result[point_id] = point_value
+
+            return result
+        finally:
+            cursor.close()
+
+
 
     def clear(self):
         self.connection.close()
@@ -446,9 +462,21 @@ def test_get_point_id_type():
     result = oracle_adapter.get_point_id_type(ids)
     print '##'*50
     print result
+    for k,v in result.items():
+        for y in v.keys():
+            print y
     oracle_adapter.clear()
 
+def test_get_point_id_to_value():
+    oracle_adapter = OracleAdapter()
+    ids = ['310109.XH.8001.21719.21','310109.XH.8001.21719.12','310109.XH.8001.21719.9','310109.XH.8001.21719.8','310109.XH.8001.21719.16','310109.XH.8001.21719.3','310109.XH.8001.21719.2','310109.XH.8001.21719.1','310109.XH.8001.21719.10','310109.XH.8001.21248.8','310109.XH.8001.21248.9','310109.XH.8001.21248.1','310109.XH.8001.21248.21','310109.XH.8001.21248.3','310109.XH.8001.21248.16','310109.XH.8001.21248.12','310109.XH.8001.21248.2','310109.XH.8001.21248.10']
+    result = oracle_adapter.get_point_id_to_value(ids)
+    print '##'*50
+    print result
+    oracle_adapter.clear()
+
+
 if __name__ == '__main__':
-    test_get_point_id_type()
+    test_get_point_id_to_value()
 
 
