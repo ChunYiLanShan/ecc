@@ -86,17 +86,23 @@ class MySqlAdatper(object):
                             VALUES """
 
         values_list = []
+        def to_sql_repr(value):
+            if value is None:
+                return 'NULL'
+            else:
+                return str(value)
+
         for equip_energy_data in equip_energy_data_list:
-            new_row = "(" + str(equip_energy_data.voltage_A )
-            new_row += "," + str(equip_energy_data.voltage_B)
-            new_row += "," + str(equip_energy_data.voltage_C)
-            new_row += "," + str(equip_energy_data.current_A)
-            new_row += "," + str(equip_energy_data.current_B)
-            new_row += "," + str(equip_energy_data.current_C)
-            new_row += "," + str(equip_energy_data.quantity)
-            new_row += "," + str(equip_energy_data.power)
-            new_row += ",'" + str(datetime.now()) + "'"
-            new_row += "," + str(equip_energy_data.mysql_equip_id)
+            new_row = "(" + to_sql_repr(equip_energy_data.voltage_A )
+            new_row += "," + to_sql_repr(equip_energy_data.voltage_B)
+            new_row += "," + to_sql_repr(equip_energy_data.voltage_C)
+            new_row += "," + to_sql_repr(equip_energy_data.current_A)
+            new_row += "," + to_sql_repr(equip_energy_data.current_B)
+            new_row += "," + to_sql_repr(equip_energy_data.current_C)
+            new_row += "," + to_sql_repr(equip_energy_data.quantity)
+            new_row += "," + to_sql_repr(equip_energy_data.power)
+            new_row += ",'" + to_sql_repr(datetime.now()) + "'"
+            new_row += "," + to_sql_repr(equip_energy_data.mysql_equip_id)
             new_row += ")"
             values_list.append(new_row)
         values_sql = ",".join(values_list)
@@ -426,13 +432,24 @@ def get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list):
     name_to_ids = oracle_adapter.get_equip_name_to_ids([e.name for e in eedl])
     name_to_energy_data = dict(zip([e.name for e in eedl], eedl))
     for k, v in name_to_energy_data.items():
-        v.oracle_equip_id = name_to_ids[k]
+        if k in name_to_ids.keys(): 
+            v.oracle_equip_id = name_to_ids[k]
+        else:
+            # remove the entry whose name can't be found in oracle.
+            pass
+            logger.warn("Can't find equip name %s from oracle database.", k)
+            eedl.remove(v)
 
     # Get point_id -> point_type
     oracle_equip_id_to_point_id_type = oracle_adapter.get_point_id_type([e.oracle_equip_id for e in eedl])
     oracle_equip_id_to_energy_data = dict(zip([e.oracle_equip_id for e in eedl], eedl))
     for oracle_equip_id, energy_data in oracle_equip_id_to_energy_data.items():
-        energy_data.point_id_to_type = oracle_equip_id_to_point_id_type[oracle_equip_id]
+        if oracle_equip_id in oracle_equip_id_to_point_id_type.keys():
+            energy_data.point_id_to_type = oracle_equip_id_to_point_id_type[oracle_equip_id]
+        else:
+            pass
+            logger.warn("Can't find equip number %s in rtm_point.", oracle_equip_id)
+            eedl.remove(oracle_equip_id_to_energy_data[oracle_equip_id])
 
     # Get point value and update to energy data
     point_id_list = []
@@ -461,20 +478,26 @@ def collect():
     mysqladapter = MySqlAdatper(mysql_host, mysql_user, mysql_password, mysql_database)
     indexes = mysqladapter.get_all_equip_names()
 
-    #in batch style
-    equip_energy_data_list = []
-    for id_type_pair in indexes[:10]:
-        equip_energy_data = EquipEnergyData()
-        equip_energy_data.mysql_equip_id = id_type_pair['id']
-        equip_energy_data.name = id_type_pair['name']
-        equip_energy_data_list.append(equip_energy_data)
+    batch_size = 100
+    import math
+    step_cnt = int(math.ceil(len(indexes)/100.0))
+    for i in range(step_cnt):
+        batch_indexes = indexes[i*100: (i+1)*100]
+
+        #in batch style
+        equip_energy_data_list = []
+        for id_type_pair in batch_indexes:
+            equip_energy_data = EquipEnergyData()
+            equip_energy_data.mysql_equip_id = id_type_pair['id']
+            equip_energy_data.name = id_type_pair['name']
+            equip_energy_data_list.append(equip_energy_data)
 
 
-    logger.info("Equipments count: %s", len(indexes))
+        logger.info("Equipments count: %s", len(indexes))
 
-    oracle_adapter = OracleAdapter()
-    get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list)
-    mysqladapter.insert_energy_point_data_in_batch(equip_energy_data_list)
+        oracle_adapter = OracleAdapter()
+        get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list)
+        mysqladapter.insert_energy_point_data_in_batch(equip_energy_data_list)
 
     oracle_adapter.clear()
     mysqladapter.clear()
@@ -505,6 +528,7 @@ def test_get_point_id_to_value():
     print '##'*50
     print result
     oracle_adapter.clear()
+
 def test_get_equip_engery_data_in_batch():
     energy_data_list = []
     energy_data = EquipEnergyData()
