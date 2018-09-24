@@ -96,6 +96,10 @@ class EquipEnergyData(object):
         self.current_C = None
         self.quatity = None
         self.power = None 
+
+        #mapping data
+        self.point_id_to_type = {} 
+
     def __str__(self):
         return str(self.__dict__)
 
@@ -267,8 +271,96 @@ class OracleAdapter(object):
         finally:
             cursor.close()
 
+    def get_equip_name_to_ids(self, names):
+        '''
+        return {'name':'id', ...}
+        '''
+        names_sql = ','.join(map(lambda e : "'%s'" % e, names))
+        sql = """SELECT EQUIP_ID, EQUIP_TYPE_ID, EQUIP_NAME FROM hqliss1.EQ_EQUIP WHERE equip_name IN (%s)""" % names_sql 
+        logger.info('SQL:%s', sql)
+        try:
+            cursor = self.connection.cursor()
+            i = 0
+            cursor.execute(sql)
+            dict_list= self._rows_to_dict_list(cursor)
+            result = {}
+            for row_dict in dict_list:
+                print row_dict
+                result[row_dict['EQUIP_NAME']] = '%s.%s' % (row_dict['EQUIP_TYPE_ID'], row_dict['EQUIP_ID'])
+            if len(names) > len(result):
+                logger.warn('Not found some corresponding equip based on name')
+            return result
+        finally:
+            cursor.close()
+
+    def get_point_id_type(equip_id_list):
+        '''
+        return {'equip_id': {'point_id':'point_type', ... }, ... }
+        '''
+
+        equip_no_list = ','.join(map(lambda e : "'%s'" % e, equip_id_list))
+
+        sql = """SELECT point_id, point_name, short_code, depict, equip_no FROM hqliss1.RTM_POINT WHERE equip_no IN (%s)""" % equip_no_list 
+        logger.info('SQL for get_point_id_type: %s', sql)
+
+        try:
+            cursor = self.connection.cursor()
+            i = 0
+            cursor.execute(sql)
+            result = {}
+            rows_list = self._rows_to_dict_list(cursor)
+
+            return result
+        finally:
+            cursor.close()
+
+    def get_point_id_to_value(point_id_list):
+        '''
+        return {'point_id':'value', ... }
+        '''
+        pass
+
     def clear(self):
         self.connection.close()
+
+
+def get_equip_engery_data_in_batch(oralce_adapter, equip_energy_data_list):
+    '''
+    indexes:
+        [{'id':'', 'name':''}, ...]
+    return:
+        [EquipEnergyData, EquipEnergyData, ...]
+    '''
+    # Get oracle_equip_id and update equip_energy_data_list
+
+    eedl = equip_energy_data_list
+    name_to_ids = oracle_adapter.get_equip_name_to_ids([e.name for e in eedl])
+    name_to_energy_data = dict(zip([e.name for e in eedl], eedl))
+    for k, v in name_to_energy_data.items():
+        v.oracle_equip_id = name_to_ids[k]
+
+    # Get point_id -> point_type
+    oracle_equip_id_to_point_id_type = oracle_adapter.get_point_id_type([e.oracle_equip_id for e in eedl])
+    oracle_equip_id_to_energy_data = dict(zip([e.oracle_equip_id for e in eedl], eedl))
+    for oracle_equip_id, energy_data in oracle_equip_id_to_energy_data:
+        energy_data.point_id_to_type = oracle_equip_id_to_point_id_type[oracle_equip_id]
+
+    # Get point value and update to energy data
+    point_id_list = []
+    for k,v in oracle_equip_id_to_point_id_type:
+        point_id_list += v.keys()
+
+    point_id_to_value = oracle_adapter.get_point_id_to_value(point_id_list)
+    point_id_to_energy_data = {}
+    for e in eedl:
+        point_id_to_type = e.point_id_to_type
+        for point_id in point_id_to_type.keys():
+            point_id_to_energy_data[point_id] = e
+
+    for point_id, point_value in point_id_to_value:
+        e = point_id_to_energy_data[point_id]
+        setattr(e, e.point_id_to_type, point_value)
+
 
 
 def collect():
@@ -279,10 +371,21 @@ def collect():
     mysql_database = os.environ['MYSQL_DATABASE']
     mysqladapter = MySqlAdatper(mysql_host, mysql_user, mysql_password, mysql_database)
     indexes = mysqladapter.get_all_equip_names()
+
+    #in batch style
+    equip_energy_data_list = []
+    for id_type_pair in indexes[:10]:
+        equip_energy_data = EquipEnergyData()
+        self.mysql_equip_id = id_type_pair['id']
+        self.name = id_type_pair['name']
+        equip_energy_data_list.append(equip_energy_data)
+
+
     logger.info("Equipments count: %s", len(indexes))
 
     oracle_adapter = OracleAdapter()
-    for index in indexes[:10]:
+    get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list)
+    for index in indexes[:100]:
         logger.debug('Collect data for equipment:%s', index)
         equip_energy_data = oracle_adapter.get_data_for_equip(index['name'], index['id'])
         print equip_energy_data
@@ -290,7 +393,14 @@ def collect():
     oracle_adapter.clear()
     mysqladapter.clear()
 
+def test_get_equip_name_to_ids():
+    oracle_adapter = OracleAdapter()
+    names = [u'门诊楼B1层低配间A1L31柜螺杆机3号PE410R', u'科教楼B1层低配间行政楼空调PE410R']
+    result = oracle_adapter.get_equip_name_to_ids(names)
+    print '##'*50
+    print result
+    oracle_adapter.clear()
 if __name__ == '__main__':
-    collect()
+    test_get_equip_name_to_ids()
 
 
