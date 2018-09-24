@@ -293,8 +293,9 @@ class OracleAdapter(object):
         finally:
             cursor.close()
 
-    def get_point_id_type(equip_id_list):
+    def get_point_id_type(self, equip_id_list):
         '''
+        input: ['type.id', 'type.id',...]
         return {'equip_id': {'point_id':'point_type', ... }, ... }
         '''
 
@@ -303,12 +304,50 @@ class OracleAdapter(object):
         sql = """SELECT point_id, point_name, short_code, depict, equip_no FROM hqliss1.RTM_POINT WHERE equip_no IN (%s)""" % equip_no_list 
         logger.info('SQL for get_point_id_type: %s', sql)
 
+        def check_point_type(row_dict):
+            voltage_a_str = u'A相电压'
+            voltage_b_str = u'B相电压'
+            voltage_c_str = u'C相电压'
+            current_a_str = u'A相电流'
+            current_b_str = u'B相电流'
+            current_c_str = u'C相电流'
+            power_str = u'有功功率'
+            quatity_str = u'有功功耗'
+            mysql_col_name_to_chinese_str = {
+                'voltage_A':voltage_a_str,
+                'voltage_B':voltage_b_str,
+                'voltage_C':voltage_c_str,
+                'current_A':current_a_str,
+                'current_B':current_b_str,
+                'current_C':current_c_str,
+                'power':power_str,
+                'quantity':quatity_str
+            }
+            point_name = row_dict['POINT_NAME']
+            point_depict = row_dict['DEPICT']
+            for  k,v in mysql_col_name_to_chinese_str.items():
+                if point_name == v or v in point_depict:
+                    return True, k
+            return False, None
+
+
         try:
             cursor = self.connection.cursor()
             i = 0
             cursor.execute(sql)
             result = {}
             rows_list = self._rows_to_dict_list(cursor)
+            for row_dict in rows_list:
+                equip_id = row_dict['EQUIP_NO']
+                point_id = row_dict['POINT_ID']
+                is_need_type, point_type = check_point_type(row_dict)
+                if is_need_type:
+                    if equip_id in result:
+                        pass
+                        point_id_to_type = result[equip_id]
+                        point_id_to_type[point_id] = point_type
+                    else:
+                        result[equip_id] = { point_id: point_type }
 
             return result
         finally:
@@ -400,7 +439,16 @@ def test_get_equip_name_to_ids():
     print '##'*50
     print result
     oracle_adapter.clear()
+
+def test_get_point_id_type():
+    oracle_adapter = OracleAdapter()
+    ids = ['8001.21719', '8001.21248']
+    result = oracle_adapter.get_point_id_type(ids)
+    print '##'*50
+    print result
+    oracle_adapter.clear()
+
 if __name__ == '__main__':
-    test_get_equip_name_to_ids()
+    test_get_point_id_type()
 
 
