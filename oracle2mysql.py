@@ -379,7 +379,7 @@ class OracleAdapter(object):
         self.connection.close()
 
 
-def get_equip_engery_data_in_batch(oralce_adapter, equip_energy_data_list):
+def get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list):
     '''
     indexes:
         [{'id':'', 'name':''}, ...]
@@ -397,12 +397,12 @@ def get_equip_engery_data_in_batch(oralce_adapter, equip_energy_data_list):
     # Get point_id -> point_type
     oracle_equip_id_to_point_id_type = oracle_adapter.get_point_id_type([e.oracle_equip_id for e in eedl])
     oracle_equip_id_to_energy_data = dict(zip([e.oracle_equip_id for e in eedl], eedl))
-    for oracle_equip_id, energy_data in oracle_equip_id_to_energy_data:
+    for oracle_equip_id, energy_data in oracle_equip_id_to_energy_data.items():
         energy_data.point_id_to_type = oracle_equip_id_to_point_id_type[oracle_equip_id]
 
     # Get point value and update to energy data
     point_id_list = []
-    for k,v in oracle_equip_id_to_point_id_type:
+    for k,v in oracle_equip_id_to_point_id_type.items():
         point_id_list += v.keys()
 
     point_id_to_value = oracle_adapter.get_point_id_to_value(point_id_list)
@@ -412,9 +412,9 @@ def get_equip_engery_data_in_batch(oralce_adapter, equip_energy_data_list):
         for point_id in point_id_to_type.keys():
             point_id_to_energy_data[point_id] = e
 
-    for point_id, point_value in point_id_to_value:
+    for point_id, point_value in point_id_to_value.items():
         e = point_id_to_energy_data[point_id]
-        setattr(e, e.point_id_to_type, point_value)
+        setattr(e, e.point_id_to_type[point_id], point_value)
 
 
 
@@ -474,9 +474,24 @@ def test_get_point_id_to_value():
     print '##'*50
     print result
     oracle_adapter.clear()
+def test_get_equip_engery_data_in_batch():
+    energy_data_list = []
+    energy_data = EquipEnergyData()
+    energy_data.name = u'门诊楼B1层低配间A1L31柜螺杆机3号PE410R'
+    energy_data_list.append(energy_data)
+    energy_data = EquipEnergyData()
+    energy_data.name = u'科教楼B1层低配间行政楼空调PE410R'
+    energy_data_list.append(energy_data)
+    oracle_adapter = OracleAdapter()
+    get_equip_engery_data_in_batch(oracle_adapter, energy_data_list)
+    for e in energy_data_list:
+        print e
+    oracle_adapter.clear()
+
+    
 
 
 if __name__ == '__main__':
-    test_get_point_id_to_value()
+    test_get_equip_engery_data_in_batch()
 
 
