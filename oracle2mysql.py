@@ -560,6 +560,10 @@ def test_get_equip_engery_data_in_batch():
     oracle_adapter.clear()
 
 if __name__ == '__main__':
-    collect()
+    while True:
+        secs=5*60
+        logger.info('Sleep %s seconds for next run', secs)
+        time.sleep(secs)
+        collect()
 
 
