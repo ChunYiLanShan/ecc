@@ -79,6 +79,40 @@ class MySqlAdatper(object):
         self.db_conn.commit()
 
         cursor.close()
+
+    def insert_energy_point_data_in_batch(self, equip_energy_data_list):
+        sql = """INSERT INTO energymanage_electricity_circuit_monitor_data 
+                            (voltage_A, voltage_B, voltage_C, current_A, current_B, current_C, quantity, power, time, circuit_id) 
+                            VALUES """
+
+        values_list = []
+        for equip_energy_data in equip_energy_data_list:
+            new_row = "(" + str(equip_energy_data.voltage_A )
+            new_row += "," + str(equip_energy_data.voltage_B)
+            new_row += "," + str(equip_energy_data.voltage_C)
+            new_row += "," + str(equip_energy_data.current_A)
+            new_row += "," + str(equip_energy_data.current_B)
+            new_row += "," + str(equip_energy_data.current_C)
+            new_row += "," + str(equip_energy_data.quantity)
+            new_row += "," + str(equip_energy_data.power)
+            new_row += ",'" + str(datetime.now()) + "'"
+            new_row += "," + str(equip_energy_data.mysql_equip_id)
+            new_row += ")"
+            values_list.append(new_row)
+        values_sql = ",".join(values_list)
+        sql += values_sql
+        logger.info("SQL for new energy data: %s", sql)
+
+
+        cursor = self.db_conn.cursor()
+
+        cursor.execute(sql)
+
+        # Make sure data is committed to the database
+        self.db_conn.commit()
+
+        cursor.close()
+
     def clear(self):
         self.db_conn.close()
         
@@ -431,8 +465,8 @@ def collect():
     equip_energy_data_list = []
     for id_type_pair in indexes[:10]:
         equip_energy_data = EquipEnergyData()
-        self.mysql_equip_id = id_type_pair['id']
-        self.name = id_type_pair['name']
+        equip_energy_data.mysql_equip_id = id_type_pair['id']
+        equip_energy_data.name = id_type_pair['name']
         equip_energy_data_list.append(equip_energy_data)
 
 
@@ -440,11 +474,8 @@ def collect():
 
     oracle_adapter = OracleAdapter()
     get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list)
-    for index in indexes[:100]:
-        logger.debug('Collect data for equipment:%s', index)
-        equip_energy_data = oracle_adapter.get_data_for_equip(index['name'], index['id'])
-        print equip_energy_data
-        mysqladapter.insert_energy_point_data(equip_energy_data)
+    mysqladapter.insert_energy_point_data_in_batch(equip_energy_data_list)
+
     oracle_adapter.clear()
     mysqladapter.clear()
 
@@ -488,10 +519,7 @@ def test_get_equip_engery_data_in_batch():
         print e
     oracle_adapter.clear()
 
-    
-
-
 if __name__ == '__main__':
-    test_get_equip_engery_data_in_batch()
+    collect()
 
 
