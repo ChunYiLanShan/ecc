@@ -11,10 +11,13 @@ import cx_Oracle
 
 logger = logging.getLogger()
 handler = logging.StreamHandler()
+fh = logging.FileHandler('ecc.log')
 formatter = logging.Formatter(
         '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
 handler.setFormatter(formatter)
-logger.addHandler(handler)
+fh.setFormatter(formatter)
+logger.addHandler(fh)
+#logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
 
@@ -41,7 +44,7 @@ class MySqlAdatper(object):
                               database=self.db_name)
         cursor = cnx.cursor()
 
-        query = ("SELECT id, name FROM energymanage_electricity_circuit")
+        query = ("SELECT id, name FROM energymanage_electricity_circuit ORDER BY id")
 
 
         cursor.execute(query)
@@ -478,6 +481,11 @@ def collect():
     for i in range(step_cnt):
         batch_indexes = indexes[i*100: (i+1)*100]
 
+        
+        logger.info("Round : %s, Equip count: %s", i, len(batch_indexes))
+        id_names_str = "\n".join(['\t%s,%s' % (e['id'],e['name']) for e in batch_indexes])
+        logger.info("Collect data for %s", id_names_str)
+
         #in batch style
         equip_energy_data_list = []
         for id_type_pair in batch_indexes:
@@ -492,6 +500,7 @@ def collect():
         oracle_adapter = OracleAdapter()
         get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list)
         mysqladapter.insert_energy_point_data_in_batch(equip_energy_data_list)
+        logger.info("Round : %s complete.", i)
 
     oracle_adapter.clear()
     mysqladapter.clear()
