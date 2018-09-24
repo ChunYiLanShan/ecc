@@ -167,8 +167,6 @@ class OracleAdapter(object):
         self.connection = cx_Oracle.connect(self.user, self.password, "%s:%s/%s" % (self.host, self.port, self.orcl_inst))
 
     def _exe_sql(self, cursor, sql):
-        print '#'*100
-        print sql
         cursor.execute(sql)
         for x in cursor:
             for y in x:
@@ -190,7 +188,6 @@ class OracleAdapter(object):
             # Get point current value
             point_value = self._get_point_val_from_rtm_controldata(point['point_id'])
             point['point_value'] = point_value
-        print '**' * 50
         equip_data = EquipEnergyData()
         equip_data.mysql_equip_id = mysql_equip_id
         equip_data.name = name
@@ -233,7 +230,6 @@ class OracleAdapter(object):
         '''
         equip_no = '%s.%s' % (str(equip_type), str(equip_id))
         sql = """SELECT point_id, point_name, short_code, depict,equip_no FROM hqliss1.RTM_POINT WHERE equip_no = '%s'""" % equip_no
-        print '#'* 50
         voltage_a_str = u'A相电压'
         voltage_b_str = u'B相电压'
         voltage_c_str = u'C相电压'
@@ -304,7 +300,6 @@ class OracleAdapter(object):
             result = {}
             for x in cursor:
                 i += 1
-                print x
                 result ={'id':x[0], 'type':x[1]}
             assert i == 1
             return result
@@ -325,7 +320,6 @@ class OracleAdapter(object):
             dict_list= self._rows_to_dict_list(cursor)
             result = {}
             for row_dict in dict_list:
-                print row_dict
                 result[row_dict['EQUIP_NAME']] = '%s.%s' % (row_dict['EQUIP_TYPE_ID'], row_dict['EQUIP_ID'])
             if len(names) > len(result):
                 logger.warn('Not found some corresponding equip based on name')
