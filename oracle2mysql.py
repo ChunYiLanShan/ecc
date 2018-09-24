@@ -5,6 +5,7 @@ import mysql.connector
 import logging
 import os
 import sys
+import time
 
 #oracle
 import cx_Oracle
@@ -19,6 +20,16 @@ fh.setFormatter(formatter)
 logger.addHandler(fh)
 #logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
+
+def my_timer(func):
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        ret = func(*args, **kwargs)
+        dur = time.time() - start
+        logger.info("Duration of function %s: %s seconds" % (func.__name__, str(dur)))
+        return ret
+
+    return wrapper
 
 
 class MySqlAdatper(object):
@@ -466,6 +477,7 @@ def get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list):
 
 
 
+@my_timer
 def collect():
     logger.debug('Start to collect enegery data')
     mysql_host= os.environ['MYSQL_HOST']
@@ -485,6 +497,7 @@ def collect():
         logger.info("Round : %s, Equip count: %s", i, len(batch_indexes))
         id_names_str = "\n".join(['\t%s,%s' % (e['id'],e['name']) for e in batch_indexes])
         logger.info("Collect data for %s", id_names_str)
+        start = time.time()
 
         #in batch style
         equip_energy_data_list = []
@@ -500,7 +513,7 @@ def collect():
         oracle_adapter = OracleAdapter()
         get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list)
         mysqladapter.insert_energy_point_data_in_batch(equip_energy_data_list)
-        logger.info("Round : %s complete.", i)
+        logger.info("Round : %s complete in %s seconds", i, time.time() - start)
 
     oracle_adapter.clear()
     mysqladapter.clear()
