@@ -10,5 +10,4 @@ RUN apt install -y vim
 # sudo apt-get install python-pip python-dev build-essential ?
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
-#CMD /opt/app/start_collect.sh
-CMD python -m SimpleHTTPServer
+CMD /opt/app/start_collect.sh

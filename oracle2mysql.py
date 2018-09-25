@@ -666,11 +666,8 @@ def collect_water():
     for k,v in name_to_equip_id.items():
         name_to_data[k].oracle_equip_id = v
 
-    print name_to_equip_id.values()
     equip_id_to_data = dict(zip([e.oracle_equip_id for e in eedl], eedl))
-    print equip_id_to_data
     equip_id_to_point_id = oracle_adapter.get_point_ids_from_water_equip_ids(name_to_equip_id.values())
-    print equip_id_to_point_id
     for k, v in equip_id_to_point_id.items():
         equip_id_to_data[k].point_id = v
 
@@ -678,9 +675,6 @@ def collect_water():
     point_id_to_data = dict(zip([e.point_id for e in eedl], eedl))
     for k, v in point_id_to_value.items():
         point_id_to_data[k].quantity = v
-    
-    for x in eedl:
-        print x
     
     mysql_adapter.insert_water_energy_point_data_in_batch(eedl)
 
@@ -746,9 +740,9 @@ def main():
     logger.info('Duration setting is %s', secs)
     
     while True:
+        collect()
         logger.info('Sleep %s seconds for next run', secs)
         time.sleep(secs)
-        collect()
 
 if __name__ == '__main__':
     main()
