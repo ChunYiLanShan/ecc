@@ -35,6 +35,16 @@ def my_timer(func):
 class MySqlAdatper(object):
 
 
+    def __init__(self):
+        self.host = os.environ['MYSQL_HOST']
+        self.user = os.environ['MYSQL_USER']
+        self.password = os.environ['MYSQL_PASSWORD']
+        self.db_name = os.environ['MYSQL_DATABASE']
+        self.db_conn = mysql.connector.connect(user=self.user, password=self.password,
+                              host=self.host,
+                              database=self.db_name)
+        
+        '''
     def __init__(self, host, user, password, db_name):
         self.host = host
         self.user = user
@@ -43,6 +53,7 @@ class MySqlAdatper(object):
         self.db_conn = mysql.connector.connect(user=self.user, password=self.password,
                               host=self.host,
                               database=self.db_name)
+                              '''
 
 
 
@@ -67,6 +78,22 @@ class MySqlAdatper(object):
         cursor.close()
         cnx.close()
         return names
+
+    def get_all_water_equip_names(self):
+        cursor = self.db_conn.cursor()
+
+        query = ("SELECT id, branch_name FROM energymanage_water_circuit ORDER BY id")
+
+
+        cursor.execute(query)
+
+        names = []
+        for (id, branch_name) in cursor:
+            index_map = {'id':id, 'name':branch_name}
+            names.append(index_map)
+        cursor.close()
+        return names
+        
 
     def insert_energy_point_data(self, equip_energy_data):
         add_energy = ("INSERT INTO energymanage_electricity_circuit_monitor_data"
@@ -133,6 +160,38 @@ class MySqlAdatper(object):
 
         cursor.close()
 
+    def insert_water_energy_point_data_in_batch(self, eedl):
+        sql = """INSERT INTO energymanage_water_circuit_monitor_data
+                            (quantity, time, circuit_id) 
+                            VALUES """
+
+        values_list = []
+        def to_sql_repr(value):
+            if value is None:
+                return 'NULL'
+            else:
+                return str(value)
+
+        for equip_energy_data in eedl:
+            new_row = "(" + to_sql_repr(equip_energy_data.quantity)
+            new_row += ",'" + to_sql_repr(datetime.now()) + "'"
+            new_row += "," + to_sql_repr(equip_energy_data.mysql_equip_id)
+            new_row += ")"
+            values_list.append(new_row)
+        values_sql = ",".join(values_list)
+        sql += values_sql
+        logger.info("SQL for new energy data: %s", sql)
+
+
+        cursor = self.db_conn.cursor()
+
+        cursor.execute(sql)
+
+        # Make sure data is committed to the database
+        self.db_conn.commit()
+
+        cursor.close()
+
     def clear(self):
         self.db_conn.close()
         
@@ -157,6 +216,16 @@ class EquipEnergyData(object):
     def __str__(self):
         return str(self.__dict__)
 
+class WaterEquipEnergyData(object):
+    def __init__(self):
+        self.mysql_equip_id = None
+        self.oracle_equip_id = None
+        self.name = None
+        self.quantity = None
+        self.point_id = None
+
+    def __str__(self):
+        return str(self.__dict__)
 
 class OracleAdapter(object):
 
@@ -422,7 +491,68 @@ class OracleAdapter(object):
             cursor.close()
 
 
+    # water 
+    def get_equip_ids_from_water_equip_names(self, names):
+        '''
+        retur {'name':'equip_id'}
+        '''
+        names_sql = ','.join(map(lambda e : "'%s'" % e, names))
+        sql = """SELECT EQUIP_ID, EQUIP_TYPE_ID, EQUIP_NAME FROM hqliss1.EQ_EQUIP WHERE equip_name IN (%s)""" % names_sql 
+        logger.info('SQL:%s', sql)
+        try:
+            cursor = self.connection.cursor()
+            i = 0
+            cursor.execute(sql)
+            dict_list= self._rows_to_dict_list(cursor)
+            result = {}
+            for row_dict in dict_list:
+                result[row_dict['EQUIP_NAME']] = '%s.%s' % (row_dict['EQUIP_TYPE_ID'], row_dict['EQUIP_ID'])
+            if len(names) > len(result):
+                logger.warn('Not found some corresponding equip based on name')
+            return result
+        finally:
+            cursor.close()
 
+    def get_point_ids_from_water_equip_ids(self, equip_ids):
+        '''
+        return {'equip_no':'point_id',...}
+        '''
+        equip_no_list = ','.join(map(lambda e : "'%s'" % e, equip_ids))
+
+        sql = """SELECT point_id, point_name, short_code, depict, equip_no FROM hqliss1.RTM_POINT WHERE equip_no IN (%s)""" % equip_no_list 
+        try:
+            cursor = self.connection.cursor()
+            i = 0
+            cursor.execute(sql)
+            dict_list= self._rows_to_dict_list(cursor)
+            result = {}
+            for row_dict in dict_list:
+                result[row_dict['EQUIP_NO']] = row_dict['POINT_ID']
+            return result
+        finally:
+            cursor.close()
+
+
+    def get_point_values_from_water_point_ids(self, point_ids):
+        '''
+        return {'point_id':'value',...}
+        '''
+
+        point_ids_sql = ','.join(map(lambda e : "'%s'" % e, point_ids))
+        sql = """SELECT POINT_ID, RECORD FROM hqliss1.RTM_CONTROLDATA WHERE POINT_ID IN (%s)""" % point_ids_sql 
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(sql)
+            result = {}
+            rows_list = self._rows_to_dict_list(cursor)
+            for row_dict in rows_list:
+                point_value = row_dict['RECORD']
+                point_id = row_dict['POINT_ID']
+                result[point_id] = point_value
+
+            return result
+        finally:
+            cursor.close()
     def clear(self):
         self.connection.close()
 
@@ -478,13 +608,9 @@ def get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list):
 
 
 @my_timer
-def collect():
-    logger.debug('Start to collect enegery data')
-    mysql_host= os.environ['MYSQL_HOST']
-    mysql_user = os.environ['MYSQL_USER']
-    mysql_password = os.environ['MYSQL_PASSWORD']
-    mysql_database = os.environ['MYSQL_DATABASE']
-    mysqladapter = MySqlAdatper(mysql_host, mysql_user, mysql_password, mysql_database)
+def collect_electricity():
+    logger.debug('Start to collect electricity enegery data')
+    mysqladapter = MySqlAdatper()
     indexes = mysqladapter.get_all_equip_names()
 
     batch_size = 100
@@ -494,7 +620,7 @@ def collect():
         batch_indexes = indexes[i*100: (i+1)*100]
 
         
-        logger.info("Round : %s, Equip count: %s", i, len(batch_indexes))
+        logger.info("Round : %s, Electricity Equip count: %s", i, len(batch_indexes))
         id_names_str = "\n".join(['\t%s,%s' % (e['id'],e['name']) for e in batch_indexes])
         logger.info("Collect data for %s", id_names_str)
         start = time.time()
@@ -517,6 +643,53 @@ def collect():
 
     oracle_adapter.clear()
     mysqladapter.clear()
+
+def collect_water():
+    mysql_adapter = MySqlAdatper()
+    oracle_adapter = OracleAdapter()
+    id_names = mysql_adapter.get_all_water_equip_names()
+
+    names = []
+    eedl = []
+    for id_name_pair in id_names:
+        equip_energy_data = WaterEquipEnergyData()
+        equip_energy_data.mysql_equip_id = id_name_pair['id']
+        equip_energy_data.name = id_name_pair['name']
+        names.append(id_name_pair['name'])
+        eedl.append(equip_energy_data)
+    
+    
+    logger.info("Equipments count: %s", len(eedl))
+
+    name_to_equip_id = oracle_adapter.get_equip_ids_from_water_equip_names(names)
+    name_to_data = dict(zip([e.name for e in eedl], eedl))
+    for k,v in name_to_equip_id.items():
+        name_to_data[k].oracle_equip_id = v
+
+    print name_to_equip_id.values()
+    equip_id_to_data = dict(zip([e.oracle_equip_id for e in eedl], eedl))
+    print equip_id_to_data
+    equip_id_to_point_id = oracle_adapter.get_point_ids_from_water_equip_ids(name_to_equip_id.values())
+    print equip_id_to_point_id
+    for k, v in equip_id_to_point_id.items():
+        equip_id_to_data[k].point_id = v
+
+    point_id_to_value = oracle_adapter.get_point_values_from_water_point_ids(equip_id_to_point_id.values())
+    point_id_to_data = dict(zip([e.point_id for e in eedl], eedl))
+    for k, v in point_id_to_value.items():
+        point_id_to_data[k].quantity = v
+    
+    for x in eedl:
+        print x
+    
+    mysql_adapter.insert_water_energy_point_data_in_batch(eedl)
+
+    oracle_adapter.clear()
+    mysql_adapter.clear()
+
+def collect():
+    collect_electricity()
+    collect_water()
 
 def test_get_equip_name_to_ids():
     oracle_adapter = OracleAdapter()
@@ -559,7 +732,14 @@ def test_get_equip_engery_data_in_batch():
         print e
     oracle_adapter.clear()
 
-if __name__ == '__main__':
+def test_get_all_water_equip_names():
+    mysqladapter = MySqlAdatper()
+    names = mysqladapter.get_all_water_equip_names()
+    for x in names:
+        for k,v in x.items():
+            print k,v
+
+def main():
     secs=5*60
     if 'ECC_DURATION' in os.environ:
         secs = int(os.environ['ECC_DURATION'])
@@ -570,4 +750,5 @@ if __name__ == '__main__':
         time.sleep(secs)
         collect()
 
-
+if __name__ == '__main__':
+    main()
