@@ -265,11 +265,15 @@ class OracleAdapter(object):
         '''
         equip_keys = self.get_equip_id_and_type(name)
         logger.info(equip_keys)
+
         result = self.get_rtm_point_ids(equip_keys['id'], equip_keys['type'])
+
         for point in result:
             # Get point current value
             point_value = self._get_point_val_from_rtm_controldata(point['point_id'])
             point['point_value'] = point_value
+
+        # Construct equip_data
         equip_data = EquipEnergyData()
         equip_data.mysql_equip_id = mysql_equip_id
         equip_data.name = name
