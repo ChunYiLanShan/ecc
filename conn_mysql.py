@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import datetime
+import os
 import mysql.connector
 
 mysql_host= os.environ['MYSQL_HOST']

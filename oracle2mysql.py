@@ -227,27 +227,26 @@ class WaterEquipEnergyData(object):
     def __str__(self):
         return str(self.__dict__)
 
+def get_oracle_conn():
+    user = os.environ['ORACLE_USER']
+    password = os.environ['ORACLE_PASSWORD']
+    host = os.environ['ORACLE_HOST']
+    port = os.environ['ORACLE_PORT']
+    orcl_inst = os.environ['ORACLE_INSTANCE']
+
+    # select chinese
+    os.environ["NLS_LANG"] = "American_America.ZHS16GBK"
+    # where chinese
+    os.environ["NLS_LANG"] = "AMERICAN_AMERICA.UTF8"
+    # Connect as user "hr" with password "welcome" to the "oraclepdb" service running on this computer.
+    connection = cx_Oracle.connect(user, password, "%s:%s/%s" % (host, port, orcl_inst))
+    return connection
+
+
 class OracleAdapter(object):
 
-    def __init__(self, host, port, orcl_inst, user, password):
-        self.host = host
-        self.port = port
-        self.orcl_inst = orcl_inst
-        self.user = user
-        self.password = password
-    def __init__(self):
-        self.user = os.environ['ORACLE_USER']
-        self.password = os.environ['ORACLE_PASSWORD']
-        self.host=os.environ['ORACLE_HOST']
-        self.port=os.environ['ORACLE_PORT']
-        self.orcl_inst=os.environ['ORACLE_INSTANCE']
-
-        # select chinese
-        os.environ["NLS_LANG"] = "American_America.ZHS16GBK"
-        # where chinese
-        os.environ["NLS_LANG"] = "AMERICAN_AMERICA.UTF8"
-        # Connect as user "hr" with password "welcome" to the "oraclepdb" service running on this computer.
-        self.connection = cx_Oracle.connect(self.user, self.password, "%s:%s/%s" % (self.host, self.port, self.orcl_inst))
+    def __init__(self, connection):
+        self.connection = connection
 
     def _exe_sql(self, cursor, sql):
         cursor.execute(sql)
@@ -278,7 +277,6 @@ class OracleAdapter(object):
         for point in result:
             setattr(equip_data, point['point_type'], point['point_value'])
         return equip_data
-
 
     def _rows_to_dict_list(self, cursor):
         columns = [i[0] for i in cursor.description]
@@ -371,10 +369,8 @@ class OracleAdapter(object):
         finally:
             cursor.close()
 
-
     def get_equip_id_and_type(self, name):
         sql = """SELECT EQUIP_ID, EQUIP_TYPE_ID FROM hqliss1.EQ_EQUIP WHERE equip_name = '%s'""" % name
-
 
         try:
             cursor = self.connection.cursor()
@@ -606,7 +602,6 @@ def get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list):
         setattr(e, e.point_id_to_type[point_id], point_value)
 
 
-
 @my_timer
 def collect_electricity():
     logger.debug('Start to collect electricity enegery data')
@@ -636,7 +631,7 @@ def collect_electricity():
 
         logger.info("Equipments count: %s", len(indexes))
 
-        oracle_adapter = OracleAdapter()
+        oracle_adapter = OracleAdapter(get_oracle_conn())
         get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list)
         mysqladapter.insert_energy_point_data_in_batch(equip_energy_data_list)
         logger.info("Round : %s complete in %s seconds", i, time.time() - start)
@@ -644,9 +639,10 @@ def collect_electricity():
     oracle_adapter.clear()
     mysqladapter.clear()
 
+
 def collect_water():
     mysql_adapter = MySqlAdatper()
-    oracle_adapter = OracleAdapter()
+    oracle_adapter = OracleAdapter(get_oracle_conn())
     id_names = mysql_adapter.get_all_water_equip_names()
 
     names = []
@@ -686,7 +682,7 @@ def collect():
     collect_water()
 
 def test_get_equip_name_to_ids():
-    oracle_adapter = OracleAdapter()
+    oracle_adapter = OracleAdapter(get_oracle_conn())
     names = [u'门诊楼B1层低配间A1L31柜螺杆机3号PE410R', u'科教楼B1层低配间行政楼空调PE410R']
     result = oracle_adapter.get_equip_name_to_ids(names)
     print '##'*50
@@ -694,7 +690,7 @@ def test_get_equip_name_to_ids():
     oracle_adapter.clear()
 
 def test_get_point_id_type():
-    oracle_adapter = OracleAdapter()
+    oracle_adapter = OracleAdapter(get_oracle_conn())
     ids = ['8001.21719', '8001.21248']
     result = oracle_adapter.get_point_id_type(ids)
     print '##'*50
@@ -705,7 +701,7 @@ def test_get_point_id_type():
     oracle_adapter.clear()
 
 def test_get_point_id_to_value():
-    oracle_adapter = OracleAdapter()
+    oracle_adapter = OracleAdapter(get_oracle_conn())
     ids = ['310109.XH.8001.21719.21','310109.XH.8001.21719.12','310109.XH.8001.21719.9','310109.XH.8001.21719.8','310109.XH.8001.21719.16','310109.XH.8001.21719.3','310109.XH.8001.21719.2','310109.XH.8001.21719.1','310109.XH.8001.21719.10','310109.XH.8001.21248.8','310109.XH.8001.21248.9','310109.XH.8001.21248.1','310109.XH.8001.21248.21','310109.XH.8001.21248.3','310109.XH.8001.21248.16','310109.XH.8001.21248.12','310109.XH.8001.21248.2','310109.XH.8001.21248.10']
     result = oracle_adapter.get_point_id_to_value(ids)
     print '##'*50
@@ -720,7 +716,7 @@ def test_get_equip_engery_data_in_batch():
     energy_data = EquipEnergyData()
     energy_data.name = u'科教楼B1层低配间行政楼空调PE410R'
     energy_data_list.append(energy_data)
-    oracle_adapter = OracleAdapter()
+    oracle_adapter = OracleAdapter(get_oracle_conn())
     get_equip_engery_data_in_batch(oracle_adapter, energy_data_list)
     for e in energy_data_list:
         print e
