@@ -27,7 +27,7 @@ For fast query speed, we need the help from concurrency.
 import os
 import sys
 import time
-from Queue import Queue
+from Queue import Queue, Empty
 from multiprocessing.dummy import Pool
 from threading import Thread
 
@@ -47,11 +47,21 @@ class MySqlHistLoader(object):
             LATEST_COUNT
         )
 
-def do_work():
-    pass
+
+def do_work(task_queue):
+    while True:
+        try:
+            task_data = task_queue.get(timeout=10)
+            print "Get task:%s" % task_data[1]
+            task_data[0](task_data[1:])
+            print "Done task"
+            task_queue.task_done()
+        except Empty:
+            print "No new task. Just exit thread"
+        return
 
 
-def concurrent_test(req):
+def test_another_way():
     concurrency_factor = 10
     # prepare task queue
     task_queue = Queue(concurrency_factor)
@@ -60,10 +70,15 @@ def concurrent_test(req):
         t = Thread(target=do_work, args=(task_queue,))
         t.daemon = True
         t.start()
+
+    mysql_adapter = oracle2mysql.MySqlAdatper()
+    hist_data_loader = MySqlHistLoader(mysql_adapter)
+
+    circuit_ids_temp = get_circuit_ids(mysql_adapter)
     try:
-        for i in range(1000):
-            task_queue.put([req])
-            task_queue.join()
+        for i in circuit_ids_temp:
+            task_queue.put([hist_data_loader.get_hist_data, i])
+        task_queue.join()
     except KeyboardInterrupt:
         sys.exit(1)
 
