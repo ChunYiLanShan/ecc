@@ -80,11 +80,9 @@ class MySqlAdatper(object):
         return names
 
     def get_all_water_equip_names(self):
+
         cursor = self.db_conn.cursor()
-
         query = ("SELECT id, branch_name FROM energymanage_water_circuit ORDER BY id")
-
-
         cursor.execute(query)
 
         names = []
@@ -93,7 +91,14 @@ class MySqlAdatper(object):
             names.append(index_map)
         cursor.close()
         return names
-        
+
+    def get_circuit_ids(self):
+        cursor = self.db_conn.cursor()
+        cursor.execute("select id from energymanage_electricity_circuit")
+        try:
+            return [circuit_id for circuit_id in cursor]
+        finally:
+            cursor.close()
 
     def insert_energy_point_data(self, equip_energy_data):
         add_energy = ("INSERT INTO energymanage_electricity_circuit_monitor_data"
