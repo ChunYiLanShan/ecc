@@ -127,7 +127,7 @@ class MySqlAdatper(object):
         print 'Before query: %s' % sql_query
         cursor.execute(sql_query)
         print 'After query: %s' % sql_query
-        hist_data_list = [hist_data for hist_data in cursor]
+        hist_data_list = []
         try:
             hist_data_list = [hist_data for hist_data in cursor]
         finally:
