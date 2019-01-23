@@ -53,7 +53,7 @@ def do_work(task_queue):
         try:
             task_data = task_queue.get(timeout=10)
             print "Get task:%s" % task_data[1]
-            task_data[0](task_data[1:])
+            task_data[0](task_data[1])
             print "Done task"
             task_queue.task_done()
         except Empty:
@@ -89,6 +89,13 @@ def get_circuit_ids(mysql_adapter):
     print "Got circuit_ids: %s" % circuit_ids
     return circuit_ids
 
+def test_no_concurrency():
+    mysql_adapter = oracle2mysql.MySqlAdatper()
+    circuit_ids_in_mysql = get_circuit_ids(mysql_adapter)
+    for i in circuit_ids_in_mysql:
+        result = mysql_adapter.get_hist_electricity_circuit_no_concurrency(i, 7)
+        print result
+
 def test_basic_function():
     print os.getpid()
     mysql_adapter = oracle2mysql.MySqlAdatper()
@@ -106,4 +113,4 @@ def test_get_hist():
     print 'End 17'
 
 if __name__ == '__main__':
-    test_get_hist()
+    test_no_concurrency()

@@ -112,10 +112,27 @@ class MySqlAdatper(object):
         print 'Before query: %s' % sql_query
         cursor.execute(sql_query)
         print 'After query: %s' % sql_query
+        hist_data_list = [hist_data for hist_data in cursor]
         try:
-            return [hist_data for hist_data in cursor]
+            hist_data_list = [hist_data for hist_data in cursor]
         finally:
             cursor.close()
+        return hist_data_list
+
+    def get_hist_electricity_circuit_no_concurrency(self, circuit_id, latest_count):
+        sql_query = '''SELECT id, time, voltage_A, voltage_B, voltage_C, current_A, current_B, current_C, power, quantity 
+                        FROM energymanage_electricity_circuit_monitor_data 
+                        WHERE circuit_id = %s ORDER BY time DESC LIMIT %s''' % (circuit_id, latest_count)
+        cursor = self.db_conn.cursor()
+        print 'Before query: %s' % sql_query
+        cursor.execute(sql_query)
+        print 'After query: %s' % sql_query
+        hist_data_list = [hist_data for hist_data in cursor]
+        try:
+            hist_data_list = [hist_data for hist_data in cursor]
+        finally:
+            cursor.close()
+        return hist_data_list
 
     def insert_energy_point_data(self, equip_energy_data):
         add_energy = ("INSERT INTO energymanage_electricity_circuit_monitor_data"
