@@ -96,7 +96,7 @@ class MySqlAdatper(object):
         cursor = self.db_conn.cursor()
         cursor.execute("select id from energymanage_electricity_circuit")
         try:
-            return [circuit_id for circuit_id in cursor]
+            return [circuit_id for (circuit_id,) in cursor]
         finally:
             cursor.close()
 
