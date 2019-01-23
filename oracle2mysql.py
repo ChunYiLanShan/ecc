@@ -34,7 +34,6 @@ def my_timer(func):
 
 class MySqlAdatper(object):
 
-
     def __init__(self):
         self.host = os.environ['MYSQL_HOST']
         self.user = os.environ['MYSQL_USER']
@@ -43,7 +42,12 @@ class MySqlAdatper(object):
         self.db_conn = mysql.connector.connect(user=self.user, password=self.password,
                               host=self.host,
                               database=self.db_name)
-        
+
+    def new_connection(self):
+        return  mysql.connector.connect(user=self.user, password=self.password,
+                              host=self.host,
+                              database=self.db_name)
+
         '''
     def __init__(self, host, user, password, db_name):
         self.host = host
@@ -100,11 +104,11 @@ class MySqlAdatper(object):
         finally:
             cursor.close()
 
-    def get_hist_electricity_circuit(self, circuit_id, latest_count):
+    def get_hist_electricity_circuit(self, new_conn, circuit_id, latest_count):
         sql_query = '''SELECT id, time, voltage_A, voltage_B, voltage_C, current_A, current_B, current_C, power, quantity 
                         FROM energymanage_electricity_circuit_monitor_data 
                         WHERE circuit_id = %s ORDER BY time DESC LIMIT %s''' % (circuit_id, latest_count)
-        cursor = self.db_conn.cursor()
+        cursor = new_conn.cursor()
         print 'Before query: %s' % sql_query
         cursor.execute(sql_query)
         print 'After query: %s' % sql_query

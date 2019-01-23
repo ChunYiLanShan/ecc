@@ -41,7 +41,11 @@ class MySqlHistLoader(object):
     def get_hist_data(self, circuit_id):
         LATEST_COUNT = 7
         print "PID: %s, ID: %s\n" % (os.getpid(), circuit_id)
-        return self.mysql_adapter.get_hist_electricity_circuit(circuit_id, LATEST_COUNT)
+        return self.mysql_adapter.get_hist_electricity_circuit(
+            self.mysql_adapter.new_connection(),
+            circuit_id,
+            LATEST_COUNT
+        )
 
 def do_work():
     pass
@@ -76,7 +80,7 @@ def test_basic_function():
     hist_data_loader = MySqlHistLoader(mysql_adapter)
     process_pool = Pool(20)
     circuit_ids_in_mysql = get_circuit_ids(mysql_adapter)
-    hist_data_list = process_pool.map(hist_data_loader.get_hist_data, circuit_ids_in_mysql[:20])
+    hist_data_list = process_pool.map(hist_data_loader.get_hist_data, circuit_ids_in_mysql[:5])
     print hist_data_list
 
 def test_get_hist():
