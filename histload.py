@@ -35,8 +35,13 @@ import oracle2mysql
 
 
 class MySqlHistLoader(object):
-    pass
+    def __init__(self, mysql_adapter):
+        self.mysql_adapter = mysql_adapter
 
+    def get_hist_data(self, circuit_id):
+        LATEST_COUNT = 7
+        print "PID: %s, ID: %s\n" % (os.getpid(), circuit_id)
+        return self.mysql_adapter.get_hist_electricity_circuit(circuit_id, LATEST_COUNT)
 
 def do_work():
     pass
@@ -59,14 +64,8 @@ def concurrent_test(req):
         sys.exit(1)
 
 
-def get_hist_data(circuit_id):
-    print "PID: %s, ID: %s\n" % (os.getpid(), circuit_id)
-    time.sleep(1)
-    return 1
-
 
 def get_circuit_ids(mysql_adapter):
-    circuit_ids = range(1,417)
     circuit_ids = mysql_adapter.get_circuit_ids()
     print "Got circuit_ids: %s" % circuit_ids
     return circuit_ids
@@ -75,6 +74,8 @@ def get_circuit_ids(mysql_adapter):
 if __name__ == '__main__':
     print os.getpid()
     mysql_adapter = oracle2mysql.MySqlAdatper()
+    hist_data_loader = MySqlHistLoader(mysql_adapter)
     process_pool = Pool(20)
-    hist_data_list = process_pool.map(get_hist_data, get_circuit_ids(mysql_adapter))
+    circuit_ids_in_mysql = get_circuit_ids(mysql_adapter)
+    hist_data_list = process_pool.map(hist_data_loader.get_hist_data, circuit_ids_in_mysql[:20])
     print hist_data_list

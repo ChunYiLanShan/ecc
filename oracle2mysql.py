@@ -100,6 +100,17 @@ class MySqlAdatper(object):
         finally:
             cursor.close()
 
+    def get_hist_electricity_circuit(self, circuit_id, latest_count):
+        sql_query = '''SELECT id, time, voltage_A, voltage_B, voltage_C, current_A, current_B, current_C, power, quantity 
+                        FROM energymanage_electricity_circuit_monitor_data 
+                        WHERE circuit_id = %s ORDER BY time DESC LIMIT %s''' % (circuit_id, latest_count)
+        cursor = self.db_conn.cursor()
+        cursor.execute(sql_query)
+        try:
+            return [hist_data for hist_data in cursor]
+        finally:
+            cursor.close()
+
     def insert_energy_point_data(self, equip_energy_data):
         add_energy = ("INSERT INTO energymanage_electricity_circuit_monitor_data"
                       "(voltage_A, voltage_B, voltage_C, current_A, current_B, current_C, quantity, power, time, circuit_id) "
