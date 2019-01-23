@@ -70,8 +70,7 @@ def get_circuit_ids(mysql_adapter):
     print "Got circuit_ids: %s" % circuit_ids
     return circuit_ids
 
-
-if __name__ == '__main__':
+def test_basic_function():
     print os.getpid()
     mysql_adapter = oracle2mysql.MySqlAdatper()
     hist_data_loader = MySqlHistLoader(mysql_adapter)
@@ -79,3 +78,13 @@ if __name__ == '__main__':
     circuit_ids_in_mysql = get_circuit_ids(mysql_adapter)
     hist_data_list = process_pool.map(hist_data_loader.get_hist_data, circuit_ids_in_mysql[:20])
     print hist_data_list
+
+def test_get_hist():
+    mysql_adapter = oracle2mysql.MySqlAdatper()
+    print 'Start 17'
+    result = mysql_adapter.get_hist_electricity_circuit(1,7)
+    print result
+    print 'End 17'
+
+if __name__ == '__main__':
+    test_get_hist()

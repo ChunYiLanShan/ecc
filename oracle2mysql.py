@@ -105,7 +105,9 @@ class MySqlAdatper(object):
                         FROM energymanage_electricity_circuit_monitor_data 
                         WHERE circuit_id = %s ORDER BY time DESC LIMIT %s''' % (circuit_id, latest_count)
         cursor = self.db_conn.cursor()
+        print 'Before query: %s' % sql_query
         cursor.execute(sql_query)
+        print 'After query: %s' % sql_query
         try:
             return [hist_data for hist_data in cursor]
         finally:
