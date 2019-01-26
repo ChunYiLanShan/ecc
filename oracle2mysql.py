@@ -34,16 +34,23 @@ def my_timer(func):
     return wrapper
 
 
+def get_mysql_conn():
+    host = os.environ['MYSQL_HOST']
+    user = os.environ['MYSQL_USER']
+    password = os.environ['MYSQL_PASSWORD']
+    db_name = os.environ['MYSQL_DATABASE']
+    return mysql.connector.connect(
+        user=user,
+        password=password,
+        host=host,
+        database=db_name
+    )
+
+
 class MySqlAdatper(object):
 
-    def __init__(self):
-        self.host = os.environ['MYSQL_HOST']
-        self.user = os.environ['MYSQL_USER']
-        self.password = os.environ['MYSQL_PASSWORD']
-        self.db_name = os.environ['MYSQL_DATABASE']
-        self.db_conn = mysql.connector.connect(user=self.user, password=self.password,
-                              host=self.host,
-                              database=self.db_name)
+    def __init__(self, db_conn):
+        self.db_conn = db_conn
 
     def new_connection(self):
         return  mysql.connector.connect(user=self.user, password=self.password,
@@ -272,6 +279,7 @@ class EquipEnergyData(object):
 
     def __str__(self):
         return str(self.__dict__)
+
 
 class WaterEquipEnergyData(object):
     def __init__(self):
@@ -671,7 +679,7 @@ def get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list):
 @my_timer
 def collect_electricity():
     logger.debug('Start to collect electricity energy data')
-    mysqladapter = MySqlAdatper()
+    mysqladapter = MySqlAdatper(get_mysql_conn())
     oracle_adapter = OracleAdapter(get_oracle_conn())
 
     fit_tool = datafit.FittingTool(mysqladapter)
@@ -711,7 +719,7 @@ def collect_electricity():
 
 
 def collect_water():
-    mysql_adapter = MySqlAdatper()
+    mysql_adapter = MySqlAdatper(get_mysql_conn())
     oracle_adapter = OracleAdapter(get_oracle_conn())
     id_names = mysql_adapter.get_all_water_equip_names()
 
@@ -792,7 +800,7 @@ def test_get_equip_engery_data_in_batch():
     oracle_adapter.clear()
 
 def test_get_all_water_equip_names():
-    mysqladapter = MySqlAdatper()
+    mysqladapter = MySqlAdatper(get_mysql_conn())
     names = mysqladapter.get_all_water_equip_names()
     for x in names:
         for k,v in x.items():

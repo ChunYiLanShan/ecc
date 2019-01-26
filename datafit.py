@@ -155,7 +155,9 @@ class FittingTool(object):
         """
         fitted_energy_data = oracle2mysql.EquipEnergyData()
         fields = oracle2mysql.EquipEnergyData.FIELD_LIST
-
+        ids = [energy_data.mysql_equip_id for energy_data in energy_data_hist_for_single_equip]
+        assert len(set(ids)) == 1
+        fitted_energy_data.mysql_equip_id = ids[0]
         for field in fields:
             field_vals = map(
                 lambda obj: getattr(obj, field),
@@ -163,6 +165,7 @@ class FittingTool(object):
             )
             fitted_val = FittingTool.fit_data(field_vals)
             setattr(fitted_energy_data, field, fitted_val)
+
 
         return fitted_energy_data
 
@@ -191,7 +194,7 @@ class FittingTool(object):
 
 
 if __name__ == '__main__':
-    sql_adapter = oracle2mysql.MySqlAdatper()
+    sql_adapter = oracle2mysql.MySqlAdatper(oracle2mysql.get_mysql_conn())
     hist_loader = MySqlHistLoader(sql_adapter)
     circuit_hist_data = hist_loader.get_hist_data()
     print circuit_hist_data
