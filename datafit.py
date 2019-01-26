@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 
-'''
-Load history data from MySQL.
+"""
+There are two jobs for data fitting:
+    1. Load history data for data fitting;
+    2. Data fitting.
+
+1. Load history data from MySQL.
 What I want to do is
 SELECT
    GROUP_CONCAT(energy.voltage_A ORDER BY time DESC SEPARATOR ',' LIMIT 7) as latest_7_voltage_A,
@@ -23,7 +27,9 @@ return hist_data
 
 The complexity of such workaround is O(n) where n is the count of energymanage_electricity_circuit.
 For fast query speed, we need the help from concurrency.
-'''
+
+2. data fitting
+"""
 
 import oracle2mysql
 
@@ -45,6 +51,38 @@ class MySqlHistLoader(object):
             result = self.mysql_adapter.get_hist_electricity_circuit(i, self.latest_count)
             hist_data.append(result)
         return hist_data
+
+
+class FittingTools(object):
+    def __init__(self):
+        pass
+
+    def fitting_for_oracle_connecting_lost(self, hist_data_list):
+        """
+         如果连不上Oracle数据库，那么就要查询MySQL获得历史数据，根据历史数据进行拟合，然后，再填入MySQLß
+        """
+        return self.fitting_all_circuits(hist_data_list)
+
+    def fitting_all_circuits(self, hist_data_list):
+        return map(self.fitting_energy_data, hist_data_list)
+
+    def fitting_all_circuits_to_dict(self, hist_data_list):
+        fitted_data = self.fitting_all_circuits(hist_data_list)
+        mysql_equip_ids = map(lambda energy_data: energy_data.mysql_equip_id, fitted_data)
+        return dict(
+            zip(
+                mysql_equip_ids,
+                fitted_data
+            )
+        )
+
+    def fitting_for_obsolete_data(self, hist_data_list, equip_energy_data_list):
+        hist_loader = MySqlHistLoader
+        hist_loader.get_hist_data()
+
+    def fitting_energy_data(self, equip_energy_data_hist):
+        #TODO
+        return oracle2mysql.EquipEnergyData()
 
 
 if __name__ == '__main__':

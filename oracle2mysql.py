@@ -105,13 +105,11 @@ class MySqlAdatper(object):
             cursor.close()
 
     def get_hist_electricity_circuit(self, circuit_id, latest_count):
-        sql_query = '''SELECT id, time, voltage_A, voltage_B, voltage_C, current_A, current_B, current_C, power, quantity 
+        sql_query = '''SELECT id, circuit_id, time, voltage_A, voltage_B, voltage_C, current_A, current_B, current_C, power, quantity 
                         FROM energymanage_electricity_circuit_monitor_data 
                         WHERE circuit_id = %s ORDER BY time DESC LIMIT %s''' % (circuit_id, latest_count)
         cursor = self.db_conn.cursor()
-        print 'Before query: %s' % sql_query
         cursor.execute(sql_query)
-        print 'After query: %s' % sql_query
         hist_data_list = []
         try:
             hist_data_list = [hist_data for hist_data in cursor]
@@ -661,6 +659,7 @@ def collect_electricity():
 
         oracle_adapter = OracleAdapter(get_oracle_conn())
         get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list)
+        # fitting_for_obsolete_data(mysqladapter, fitting_for_obsolete_data)
         mysqladapter.insert_energy_point_data_in_batch(equip_energy_data_list)
         logger.info("Round : %s complete in %s seconds", i, time.time() - start)
 
