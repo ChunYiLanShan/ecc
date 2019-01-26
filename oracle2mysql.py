@@ -112,12 +112,20 @@ class MySqlAdatper(object):
                         WHERE circuit_id = %s ORDER BY time DESC LIMIT %s''' % (circuit_id, latest_count)
         cursor = self.db_conn.cursor()
         cursor.execute(sql_query)
-        hist_data_list = []
+        hist_energy_data_list = []
         try:
-            hist_data_list = [hist_data for hist_data in cursor]
+            row_dict_list = self._rows_to_dict_list(cursor)
+            for row_dict in row_dict_list:
+                hist_energy_data_list.append(
+                    EquipEnergyData.build_from_dict(
+                        row_dict['circuit_id'],
+                        row_dict
+                    )
+                )
+
         finally:
             cursor.close()
-        return hist_data_list
+        return hist_energy_data_list
 
     def insert_energy_point_data(self, equip_energy_data):
         add_energy = ("INSERT INTO energymanage_electricity_circuit_monitor_data"
@@ -218,6 +226,11 @@ class MySqlAdatper(object):
 
     def clear(self):
         self.db_conn.close()
+
+    #TODO: Dedup this method in OracleAdapter
+    def _rows_to_dict_list(self, cursor):
+        columns = [i[0] for i in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor]
         
 
 class EquipEnergyData(object):
@@ -231,7 +244,16 @@ class EquipEnergyData(object):
         'power',
         'quantity'
     ]
-    
+
+    @staticmethod
+    def build_from_dict(mysql_equip_id, prop_to_value):
+        energy_data = EquipEnergyData()
+        energy_data.mysql_equip_id = mysql_equip_id
+        for field in EquipEnergyData.FIELD_LIST:
+            if field in prop_to_value.keys():
+                setattr(energy_data, field, prop_to_value[field])
+        return energy_data
+
     def __init__(self):
         self.mysql_equip_id = None
         self.oracle_equip_id = None
@@ -649,13 +671,14 @@ def get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list):
 @my_timer
 def collect_electricity():
     logger.debug('Start to collect electricity energy data')
+    mysqladapter = MySqlAdatper()
+    oracle_adapter = OracleAdapter(get_oracle_conn())
 
-    fit_tool = datafit.FittingTool()
+    fit_tool = datafit.FittingTool(mysqladapter)
     if not OracleAdapter.is_oracle_available():
         fit_tool.fit_all()
         return
 
-    mysqladapter = MySqlAdatper()
     indexes = mysqladapter.get_all_equip_names()
 
     batch_size = 100
@@ -668,8 +691,7 @@ def collect_electricity():
         id_names_str = "\n".join(['\t%s,%s' % (e['id'],e['name']) for e in batch_indexes])
         logger.info("Collect data for %s", id_names_str)
         start = time.time()
-
-        #in batch style
+        # in batch style
         equip_energy_data_list = []
         for id_type_pair in batch_indexes:
             equip_energy_data = EquipEnergyData()
@@ -677,10 +699,8 @@ def collect_electricity():
             equip_energy_data.name = id_type_pair['name']
             equip_energy_data_list.append(equip_energy_data)
 
-
         logger.info("Equipments count: %s", len(indexes))
 
-        oracle_adapter = OracleAdapter(get_oracle_conn())
         get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list)
         fit_tool.fit_energy_data_when_no_update(equip_energy_data_list)
         mysqladapter.insert_energy_point_data_in_batch(equip_energy_data_list)

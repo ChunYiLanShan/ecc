@@ -45,25 +45,95 @@ class MySqlHistLoader(object):
         return circuit_ids
 
     def get_hist_data(self):
+        """
+        Get history energy data for all electronic equipments.
+        :return: A tuple with below info:
+        (
+        [
+            [equip1_data1, equip1_data2],
+            [equip2_data1, equip2_data2],
+            ...
+        ]
+        ,
+        {
+            'equip1':[equip1_data1, equip1_data2],
+            'equip2':[equip2_data1, equip2_data2],
+            ...
+        }
+        )
+        """
         circuit_ids_in_mysql = self.get_circuit_ids()
         hist_data = []
         hist_data_dict = {}
         for circuit_id in circuit_ids_in_mysql:
-            energy_data = self.to_energy_data(
-                self.mysql_adapter.get_hist_electricity_circuit(circuit_id, self.latest_count)
+            hist_energy_data = self.mysql_adapter.get_hist_electricity_circuit(
+                circuit_id,
+                self.latest_count
             )
-            hist_data_dict[circuit_id] = energy_data
-            hist_data.append(energy_data)
+
+            hist_data_dict[circuit_id] = hist_energy_data
+            hist_data.append(hist_energy_data)
         return hist_data, hist_data_dict
 
 
 class FittingTool(object):
     def __init__(self, mysql_adapter):
-        hist_loader = MySqlHistLoader(mysql_adapter)
-        self.hist_energy_data, self.hist_energy_data_dict = hist_loader.get_hist_data()
+        self.mysql_adapter = mysql_adapter
+        self.hist_loader = MySqlHistLoader(self.mysql_adapter)
+        self.hist_energy_data, self.hist_energy_data_dict = self.hist_loader.get_hist_data()
         self.fitted_energy_data_dict = self.fit_hist_energy_data(self.hist_energy_data)
 
+    def fit_all(self):
+        indexes = self.mysql_adapter.get_all_equip_names()
+        equip_energy_data_list = []
+        for id_type_pair in indexes:
+            equip_energy_data = oracle2mysql.EquipEnergyData()
+            equip_energy_data.mysql_equip_id = id_type_pair['id']
+            equip_energy_data.name = id_type_pair['name']
+            equip_energy_data_list.append(equip_energy_data)
+
+        oracle2mysql.logger.info("Equipments count: %s", len(indexes))
+
+        self.mysql_adapter.insert_energy_point_data_in_batch(self.fitted_energy_data_dict.values())
+
+    def fit_energy_data_when_no_update(self, equip_energy_data_list):
+        """
+        For given list of EquipEnergyData, patch it with fitted data if needed.
+        :param equip_energy_data_list:
+        :return:
+        """
+        for equip_energy_data in equip_energy_data_list:
+            for field in oracle2mysql.EquipEnergyData.FIELD_LIST:
+                if FittingTool.need_fit(equip_energy_data, self.hist_energy_data_dict, field):
+                    setattr(
+                        equip_energy_data,
+                        field,
+                        self.fitted_energy_data_dict[equip_energy_data.mysql_equip_id]
+                    )
+
+    @staticmethod
+    def need_fit(equip_energy_data, hist_energy_data_dict, field_name):
+        """
+        Check if this property of EquipEnergyData needs fitting.
+        :param equip_energy_data:
+        :param hist_energy_data_dict:
+        :param field_name:
+        :return:
+        """
+        circuit_id = equip_energy_data.mysql_equip_id
+        field_collected_val = getattr(equip_energy_data, field_name)
+        field_latest_imported_val = getattr(
+            hist_energy_data_dict[circuit_id][0],
+            field_name
+        )
+        return field_collected_val == field_latest_imported_val
+
     def fit_hist_energy_data(self, hist_energy_data):
+        """
+        For all history energy data of equipments, fit the data respectively.
+        :param hist_energy_data: List of List [ [equip_1_hist_1, equip_1_hist_2], [equip_2_hist_1, equip_2_hist_2],... ]
+        :return: key is equip id, value is fitted EquipEnergyData instance.
+        """
         fitted_energy_data = map(
             self.fit_energy_data,
             hist_energy_data
@@ -75,40 +145,14 @@ class FittingTool(object):
             )
         )
 
-    def fit_all(self):
-        return map(self.fit_energy_data, self.hist_energy_data)
-
-    @staticmethod
-    def need_fit(equip_energy_data, hist_energy_data_dict, field_name):
-        circuit_id = equip_energy_data.mysql_equip_id
-        field_collected_val = getattr(equip_energy_data, field_name)
-        field_latest_imported_val = getattr(
-            hist_energy_data_dict[circuit_id][0],
-            field_name
-        )
-        return field_collected_val == field_latest_imported_val
-
-    def fit_energy_data_when_no_update(self, equip_energy_data_list):
-        for equip_energy_data in equip_energy_data_list:
-            for field in oracle2mysql.EquipEnergyData.FIELD_LIST:
-                if FittingTool.need_fit(equip_energy_data, self.hist_energy_data_dict, field):
-                    setattr(equip_energy_data,
-                            field,
-                            self.fitted_energy_data_dict[equip_energy_data.mysql_equip_id]
-                            )
-
-    def fitting_all_circuits_to_dict(self, hist_data_list):
-        fitted_data = self.fitting_all_circuits(hist_data_list)
-        mysql_equip_ids = map(lambda energy_data: energy_data.mysql_equip_id, fitted_data)
-        return dict(
-            zip(
-                mysql_equip_ids,
-                fitted_data
-            )
-        )
-
     @staticmethod
     def fit_energy_data(energy_data_hist_for_single_equip):
+        """
+        Based on given history energy data for a specific equipment,
+        fitting all related properties of EquipEnergyData from the history data.
+        :param energy_data_hist_for_single_equip:
+        :return: a fitted EquipEnergyData object.
+        """
         fitted_energy_data = oracle2mysql.EquipEnergyData()
         fields = oracle2mysql.EquipEnergyData.FIELD_LIST
 
@@ -123,19 +167,24 @@ class FittingTool(object):
         return fitted_energy_data
 
     @staticmethod
-    def fit_data(imported_data_list):
-        assert len(imported_data_list) > 0
-        if len(imported_data_list) == 1:
-            return imported_data_list[0]
+    def fit_data(data_list):
+        """
+        Fit the data using a simple method. Refer to return.
+        :param data_list:
+        :return:  = data_list[-1] + mean(delta(data_list))
+        """
+        assert len(data_list) > 0
+        if len(data_list) == 1:
+            return data_list[0]
         # Compute the delta of adjacent elements, e.g.  [1, 3, 9, 10] => [(3-1), (9-3), (10-9)] => [2, 6, 1]
-        lst = imported_data_list # use a short name: lst
+        lst = data_list # use a short name: lst
         delta = [
             lst[i]-lst[i-1]
             for i in range(1, len(lst))
         ]
 
         mean_delta = sum(delta)/len(delta)
-        fitted_data = imported_data_list[-1] + mean_delta
+        fitted_data = data_list[-1] + mean_delta
         return fitted_data
 
 
