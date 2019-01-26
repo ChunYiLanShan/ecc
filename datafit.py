@@ -53,7 +53,7 @@ class MySqlHistLoader(object):
         return hist_data
 
 
-class FittingTools(object):
+class FittingTool(object):
     def __init__(self):
         pass
 
@@ -80,9 +80,24 @@ class FittingTools(object):
         hist_loader = MySqlHistLoader
         hist_loader.get_hist_data()
 
-    def fitting_energy_data(self, equip_energy_data_hist):
+    def fit_energy_data(self, energy_data_hist_for_single_equip):
         #TODO
         return oracle2mysql.EquipEnergyData()
+
+    def fit_data(self, imported_data_list):
+        assert len(imported_data_list) > 0
+        if len(imported_data_list) == 1:
+            return imported_data_list[0]
+        # Compute the delta of adjacent elements, e.g.  [1, 3, 9, 10] => [(3-1), (9-3), (10-9)] => [2, 6, 1]
+        lst = imported_data_list # use a short name: lst
+        delta = [
+            lst[i]-lst[i-1]
+            for i in range(1, len(lst))
+        ]
+
+        mean_delta = sum(delta)/len(delta)
+        fitted_data = imported_data_list[-1] + mean_delta
+        return fitted_data
 
 
 if __name__ == '__main__':
