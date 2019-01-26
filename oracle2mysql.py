@@ -681,7 +681,6 @@ def collect_water():
         names.append(id_name_pair['name'])
         eedl.append(equip_energy_data)
     
-    
     logger.info("Equipments count: %s", len(eedl))
 
     name_to_equip_id = oracle_adapter.get_equip_ids_from_water_equip_names(names)

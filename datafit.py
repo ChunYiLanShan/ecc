@@ -81,8 +81,27 @@ class FittingTool(object):
         hist_loader.get_hist_data()
 
     def fit_energy_data(self, energy_data_hist_for_single_equip):
-        #TODO
-        return oracle2mysql.EquipEnergyData()
+        fitted_energy_data = oracle2mysql.EquipEnergyData()
+        fields = [
+            'voltage_A',
+            'voltage_B',
+            'voltage_C',
+            'current_A',
+            'current_B',
+            'current_C',
+            'power',
+            'quantity'
+        ]
+
+        for field in fields:
+            field_vals = map(
+                lambda obj: getattr(obj, field),
+                energy_data_hist_for_single_equip
+            )
+            fitted_val = self.fit_data(field_vals)
+            setattr(fitted_energy_data, field, fitted_val)
+
+        return fitted_energy_data
 
     def fit_data(self, imported_data_list):
         assert len(imported_data_list) > 0
