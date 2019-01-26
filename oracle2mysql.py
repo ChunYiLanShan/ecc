@@ -10,6 +10,8 @@ import time
 #oracle
 import cx_Oracle
 
+import datafit
+
 logger = logging.getLogger()
 handler = logging.StreamHandler()
 fh = logging.FileHandler('ecc.log')
@@ -219,6 +221,17 @@ class MySqlAdatper(object):
         
 
 class EquipEnergyData(object):
+    FIELD_LIST = [
+        'voltage_A',
+        'voltage_B',
+        'voltage_C',
+        'current_A',
+        'current_B',
+        'current_C',
+        'power',
+        'quantity'
+    ]
+    
     def __init__(self):
         self.mysql_equip_id = None
         self.oracle_equip_id = None
@@ -266,6 +279,11 @@ def get_oracle_conn():
 
 
 class OracleAdapter(object):
+
+    @staticmethod
+    def is_oracle_available():
+        #TODO
+        return True
 
     def __init__(self, connection):
         self.connection = connection
@@ -630,7 +648,13 @@ def get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list):
 
 @my_timer
 def collect_electricity():
-    logger.debug('Start to collect electricity enegery data')
+    logger.debug('Start to collect electricity energy data')
+
+    fit_tool = datafit.FittingTool()
+    if not OracleAdapter.is_oracle_available():
+        fit_tool.fit_all()
+        return
+
     mysqladapter = MySqlAdatper()
     indexes = mysqladapter.get_all_equip_names()
 
@@ -640,7 +664,6 @@ def collect_electricity():
     for i in range(step_cnt):
         batch_indexes = indexes[i*100: (i+1)*100]
 
-        
         logger.info("Round : %s, Electricity Equip count: %s", i, len(batch_indexes))
         id_names_str = "\n".join(['\t%s,%s' % (e['id'],e['name']) for e in batch_indexes])
         logger.info("Collect data for %s", id_names_str)
@@ -659,7 +682,7 @@ def collect_electricity():
 
         oracle_adapter = OracleAdapter(get_oracle_conn())
         get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list)
-        # fitting_for_obsolete_data(mysqladapter, fitting_for_obsolete_data)
+        fit_tool.fit_energy_data_when_no_update(equip_energy_data_list)
         mysqladapter.insert_energy_point_data_in_batch(equip_energy_data_list)
         logger.info("Round : %s complete in %s seconds", i, time.time() - start)
 

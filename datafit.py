@@ -47,24 +47,55 @@ class MySqlHistLoader(object):
     def get_hist_data(self):
         circuit_ids_in_mysql = self.get_circuit_ids()
         hist_data = []
-        for i in circuit_ids_in_mysql:
-            result = self.mysql_adapter.get_hist_electricity_circuit(i, self.latest_count)
-            hist_data.append(result)
-        return hist_data
+        hist_data_dict = {}
+        for circuit_id in circuit_ids_in_mysql:
+            energy_data = self.to_energy_data(
+                self.mysql_adapter.get_hist_electricity_circuit(circuit_id, self.latest_count)
+            )
+            hist_data_dict[circuit_id] = energy_data
+            hist_data.append(energy_data)
+        return hist_data, hist_data_dict
 
 
 class FittingTool(object):
-    def __init__(self):
-        pass
+    def __init__(self, mysql_adapter):
+        hist_loader = MySqlHistLoader(mysql_adapter)
+        self.hist_energy_data, self.hist_energy_data_dict = hist_loader.get_hist_data()
+        self.fitted_energy_data_dict = self.fit_hist_energy_data(self.hist_energy_data)
 
-    def fitting_for_oracle_connecting_lost(self, hist_data_list):
-        """
-         如果连不上Oracle数据库，那么就要查询MySQL获得历史数据，根据历史数据进行拟合，然后，再填入MySQLß
-        """
-        return self.fitting_all_circuits(hist_data_list)
+    def fit_hist_energy_data(self, hist_energy_data):
+        fitted_energy_data = map(
+            self.fit_energy_data,
+            hist_energy_data
+        )
+        return dict(
+            zip(
+                [e.mysql_equip_id for e in fitted_energy_data],
+                fitted_energy_data
+            )
+        )
 
-    def fitting_all_circuits(self, hist_data_list):
-        return map(self.fitting_energy_data, hist_data_list)
+    def fit_all(self):
+        return map(self.fit_energy_data, self.hist_energy_data)
+
+    @staticmethod
+    def need_fit(equip_energy_data, hist_energy_data_dict, field_name):
+        circuit_id = equip_energy_data.mysql_equip_id
+        field_collected_val = getattr(equip_energy_data, field_name)
+        field_latest_imported_val = getattr(
+            hist_energy_data_dict[circuit_id][0],
+            field_name
+        )
+        return field_collected_val == field_latest_imported_val
+
+    def fit_energy_data_when_no_update(self, equip_energy_data_list):
+        for equip_energy_data in equip_energy_data_list:
+            for field in oracle2mysql.EquipEnergyData.FIELD_LIST:
+                if FittingTool.need_fit(equip_energy_data, self.hist_energy_data_dict, field):
+                    setattr(equip_energy_data,
+                            field,
+                            self.fitted_energy_data_dict[equip_energy_data.mysql_equip_id]
+                            )
 
     def fitting_all_circuits_to_dict(self, hist_data_list):
         fitted_data = self.fitting_all_circuits(hist_data_list)
@@ -76,34 +107,23 @@ class FittingTool(object):
             )
         )
 
-    def fitting_for_obsolete_data(self, hist_data_list, equip_energy_data_list):
-        hist_loader = MySqlHistLoader
-        hist_loader.get_hist_data()
-
-    def fit_energy_data(self, energy_data_hist_for_single_equip):
+    @staticmethod
+    def fit_energy_data(energy_data_hist_for_single_equip):
         fitted_energy_data = oracle2mysql.EquipEnergyData()
-        fields = [
-            'voltage_A',
-            'voltage_B',
-            'voltage_C',
-            'current_A',
-            'current_B',
-            'current_C',
-            'power',
-            'quantity'
-        ]
+        fields = oracle2mysql.EquipEnergyData.FIELD_LIST
 
         for field in fields:
             field_vals = map(
                 lambda obj: getattr(obj, field),
                 energy_data_hist_for_single_equip
             )
-            fitted_val = self.fit_data(field_vals)
+            fitted_val = FittingTool.fit_data(field_vals)
             setattr(fitted_energy_data, field, fitted_val)
 
         return fitted_energy_data
 
-    def fit_data(self, imported_data_list):
+    @staticmethod
+    def fit_data(imported_data_list):
         assert len(imported_data_list) > 0
         if len(imported_data_list) == 1:
             return imported_data_list[0]
@@ -117,6 +137,8 @@ class FittingTool(object):
         mean_delta = sum(delta)/len(delta)
         fitted_data = imported_data_list[-1] + mean_delta
         return fitted_data
+
+
 
 
 if __name__ == '__main__':

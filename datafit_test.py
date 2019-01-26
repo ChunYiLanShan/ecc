@@ -22,7 +22,6 @@ class FitToolTest(unittest.TestCase):
 
     # OracleAdapter Test
     def test_fit_energy_data(self):
-        fit_tool = datafit.FittingTool()
         energy_data_hist = [
             self._create_enery_data(
                 voltage_A=1.0,
@@ -45,7 +44,7 @@ class FitToolTest(unittest.TestCase):
                 quantity=2.0
             )
         ]
-        fitted_data = fit_tool.fit_energy_data(energy_data_hist)
+        fitted_data = datafit.FittingTool.fit_energy_data(energy_data_hist)
         fields = [
             'voltage_A',
             'voltage_B',
@@ -76,8 +75,7 @@ class FitToolTest(unittest.TestCase):
         self._fit_data_exception_case(AssertionError, [])
 
     def _fit_data_case(self, expected, hist_data):
-        fit_tool = datafit.FittingTool()
-        fitted_data = fit_tool.fit_data(hist_data)
+        fitted_data = datafit.FittingTool.fit_data(hist_data)
         self.assertEqual(expected, fitted_data)
 
     def _fit_data_exception_case(self, exception, bad_hist_data):
