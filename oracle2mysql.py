@@ -166,6 +166,7 @@ class MySqlAdatper(object):
                             VALUES """
 
         values_list = []
+
         def to_sql_repr(value):
             if value is None:
                 return 'NULL'
@@ -188,7 +189,6 @@ class MySqlAdatper(object):
         values_sql = ",".join(values_list)
         sql += values_sql
         logger.info("SQL for new energy data: %s", sql)
-
 
         cursor = self.db_conn.cursor()
 

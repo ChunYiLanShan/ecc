@@ -266,7 +266,6 @@ class MyTest(unittest.TestCase):
         ]
         self.assertEqual(expect, rtm_point_ids)
 
-
     def test_get_equip_id_and_type(self):
         class MockCursor(object):
             def __init__(self, ut_obj):

@@ -47,17 +47,20 @@ class MySqlHistLoader(object):
     def get_hist_data(self):
         """
         Get history energy data for all electronic equipments.
+        If there is no history data, the hist data will be a empty list.
         :return: A tuple with below info:
         (
         [
             [equip1_data1, equip1_data2],
             [equip2_data1, equip2_data2],
+            []
             ...
         ]
         ,
         {
             'equip1':[equip1_data1, equip1_data2],
             'equip2':[equip2_data1, equip2_data2],
+            'equip3': []
             ...
         }
         )
@@ -81,7 +84,7 @@ class FittingTool(object):
         self.mysql_adapter = mysql_adapter
         self.hist_loader = MySqlHistLoader(self.mysql_adapter)
         self.hist_energy_data, self.hist_energy_data_dict = self.hist_loader.get_hist_data()
-        self.fitted_energy_data_dict = self.fit_hist_energy_data(self.hist_energy_data)
+        self.fitted_energy_data_dict = self.fit_hist_energy_data(self.hist_energy_data_dict)
 
     def fit_all(self):
         indexes = self.mysql_adapter.get_all_equip_names()
@@ -93,7 +96,7 @@ class FittingTool(object):
             equip_energy_data_list.append(equip_energy_data)
 
         oracle2mysql.logger.info("Equipments count: %s", len(indexes))
-
+        # Remove None
         self.mysql_adapter.insert_energy_point_data_in_batch(self.fitted_energy_data_dict.values())
 
     def fit_energy_data_when_no_update(self, equip_energy_data_list):
@@ -128,22 +131,27 @@ class FittingTool(object):
         )
         return field_collected_val == field_latest_imported_val
 
-    def fit_hist_energy_data(self, hist_energy_data):
+    def fit_hist_energy_data(self, hist_energy_data_dict):
         """
         For all history energy data of equipments, fit the data respectively.
         :param hist_energy_data: List of List [ [equip_1_hist_1, equip_1_hist_2], [equip_2_hist_1, equip_2_hist_2],... ]
         :return: key is equip id, value is fitted EquipEnergyData instance.
         """
-        fitted_energy_data = map(
-            self.fit_energy_data,
-            hist_energy_data
-        )
-        return dict(
-            zip(
-                [e.mysql_equip_id for e in fitted_energy_data],
-                fitted_energy_data
-            )
-        )
+
+        fitted_enery_data_dict = {
+            equip_id: self.fit_energy_data(hist_data)
+            for equip_id, hist_data in hist_energy_data_dict.items()
+        }
+
+        # Remove items whose fitted data is none.
+        fitted_enery_data_dict_without_none = {}
+        for equip_id, fitted_data in fitted_enery_data_dict.items():
+            if fitted_data is None:
+                print "No history data for circuit id: %s" % equip_id
+            else:
+                fitted_enery_data_dict_without_none[equip_id] = fitted_data
+
+        return fitted_enery_data_dict_without_none
 
     @staticmethod
     def fit_energy_data(energy_data_hist_for_single_equip):
@@ -151,8 +159,12 @@ class FittingTool(object):
         Based on given history energy data for a specific equipment,
         fitting all related properties of EquipEnergyData from the history data.
         :param energy_data_hist_for_single_equip:
-        :return: a fitted EquipEnergyData object.
+        :return: a fitted EquipEnergyData object,
+                or None when input is a empty list`
         """
+        if len(energy_data_hist_for_single_equip) == 0:
+            return None
+
         fitted_energy_data = oracle2mysql.EquipEnergyData()
         fields = oracle2mysql.EquipEnergyData.FIELD_LIST
         ids = [energy_data.mysql_equip_id for energy_data in energy_data_hist_for_single_equip]
@@ -165,7 +177,6 @@ class FittingTool(object):
             )
             fitted_val = FittingTool.fit_data(field_vals)
             setattr(fitted_energy_data, field, fitted_val)
-
 
         return fitted_energy_data
 
