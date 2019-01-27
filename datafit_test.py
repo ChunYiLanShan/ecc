@@ -91,7 +91,7 @@ class FitToolTest(unittest.TestCase):
                             voltage_C=2.0,
                             current_A=2.0,
                             current_B=2.0,
-                            current_C=2.0,
+                            current_C=None,
                             power=None,
                             quantity=2.0,
                             mysql_equip_id=4
@@ -103,7 +103,7 @@ class FitToolTest(unittest.TestCase):
                             voltage_C=1.0,
                             current_A=1.0,
                             current_B=1.0,
-                            current_C=1.0,
+                            current_C=None,
                             power=None,
                             quantity=1.0,
                             mysql_equip_id=4
@@ -152,7 +152,7 @@ class FitToolTest(unittest.TestCase):
                 voltage_C=10.0,
                 current_A=10.0,
                 current_B=10.0,
-                current_C=10.0,
+                current_C=None,
                 power=10.0,
                 quantity=10.0,
                 mysql_equip_id=4
@@ -162,7 +162,7 @@ class FitToolTest(unittest.TestCase):
         mysql_adapter = MockMysqlAdapter(db_conn)
         mysql_adapter.set_ut_obj(self)
         fit_tool = datafit.FittingTool(mysql_adapter)
-        adjusted_enery_data = fit_tool.fit_energy_data_when_no_update(just_collected_energy_data_list)
+        fit_tool.fit_energy_data_when_no_update(just_collected_energy_data_list)
 
         self.assertEqual(4, len(just_collected_energy_data_list))
 
@@ -188,7 +188,7 @@ class FitToolTest(unittest.TestCase):
         fourth = just_collected_energy_data_list[3]
         self.assertEqual(10.0, fourth.voltage_A)
         self.assertEqual(4, fourth.mysql_equip_id)
-        print adjusted_enery_data
+        self.assertEqual(None, fourth.current_C)
 
     def test_fit_all(self):
 
