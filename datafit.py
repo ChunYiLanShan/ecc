@@ -48,6 +48,8 @@ class MySqlHistLoader(object):
         """
         Get history energy data for all electronic equipments.
         If there is no history data, the hist data will be a empty list.
+        The hist data for given equipment is in time's DESC order. Its hist values should be also in desc
+        order. Suppose all related data won't decrease. 佛祖保佑，不要出bug.
         :return: A tuple with below info:
         (
         [
@@ -87,15 +89,15 @@ class FittingTool(object):
         self.fitted_energy_data_dict = self.fit_hist_energy_data(self.hist_energy_data_dict)
 
     def fit_all(self):
-        indexes = self.mysql_adapter.get_all_equip_names()
-        equip_energy_data_list = []
-        for id_type_pair in indexes:
-            equip_energy_data = oracle2mysql.EquipEnergyData()
-            equip_energy_data.mysql_equip_id = id_type_pair['id']
-            equip_energy_data.name = id_type_pair['name']
-            equip_energy_data_list.append(equip_energy_data)
+        # indexes = self.mysql_adapter.get_all_equip_names()
+        # equip_energy_data_list = []
+        # for id_type_pair in indexes:
+        #     equip_energy_data = oracle2mysql.EquipEnergyData()
+        #     equip_energy_data.mysql_equip_id = id_type_pair['id']
+        #     equip_energy_data.name = id_type_pair['name']
+        #     equip_energy_data_list.append(equip_energy_data)
 
-        oracle2mysql.logger.info("Equipments count: %s", len(indexes))
+        # oracle2mysql.logger.info("Equipments count: %s", len(indexes))
         # Remove None
         self.mysql_adapter.insert_energy_point_data_in_batch(self.fitted_energy_data_dict.values())
 
@@ -108,10 +110,14 @@ class FittingTool(object):
         for equip_energy_data in equip_energy_data_list:
             for field in oracle2mysql.EquipEnergyData.FIELD_LIST:
                 if FittingTool.need_fit(equip_energy_data, self.hist_energy_data_dict, field):
+                    fitted_field_val = getattr(
+                        self.fitted_energy_data_dict[equip_energy_data.mysql_equip_id],
+                        field
+                    )
                     setattr(
                         equip_energy_data,
                         field,
-                        self.fitted_energy_data_dict[equip_energy_data.mysql_equip_id]
+                        fitted_field_val
                     )
 
     @staticmethod
@@ -124,6 +130,9 @@ class FittingTool(object):
         :return:
         """
         circuit_id = equip_energy_data.mysql_equip_id
+        if len(hist_energy_data_dict[circuit_id]) == 0:
+            return False
+
         field_collected_val = getattr(equip_energy_data, field_name)
         field_latest_imported_val = getattr(
             hist_energy_data_dict[circuit_id][0],
@@ -166,15 +175,27 @@ class FittingTool(object):
             return None
 
         fitted_energy_data = oracle2mysql.EquipEnergyData()
-        fields = oracle2mysql.EquipEnergyData.FIELD_LIST
         ids = [energy_data.mysql_equip_id for energy_data in energy_data_hist_for_single_equip]
         assert len(set(ids)) == 1
+
+        fields = oracle2mysql.EquipEnergyData.FIELD_LIST
         fitted_energy_data.mysql_equip_id = ids[0]
         for field in fields:
             field_vals = map(
                 lambda obj: getattr(obj, field),
                 energy_data_hist_for_single_equip
             )
+            desc_order = all(
+                [
+                    field_vals[i] >= field_vals[i + 1]
+                    for i in xrange(len(field_vals) - 1)
+                ]
+            )
+            if desc_order is not True:
+                err_msg = "ERROR: circuit id %s, its field %s history data is not in desc order. " \
+                      "Data is %s" % (fitted_energy_data.mysql_equip_id, field, field_vals)
+                print err_msg
+                raise Exception(err_msg)
             fitted_val = FittingTool.fit_data(field_vals)
             setattr(fitted_energy_data, field, fitted_val)
 
@@ -183,9 +204,11 @@ class FittingTool(object):
     @staticmethod
     def fit_data(data_list):
         """
+        Pre-condition: data_list is in desc order: data_list[i] >= data_list[i-1].
+                        The first element is the latest data.
         Fit the data using a simple method. Refer to return.
         :param data_list:
-        :return:  = data_list[-1] + mean(delta(data_list))
+        :return:  = data_list[0] + mean(delta(data_list))
         """
         assert len(data_list) > 0
         if len(data_list) == 1:
@@ -193,12 +216,12 @@ class FittingTool(object):
         # Compute the delta of adjacent elements, e.g.  [1, 3, 9, 10] => [(3-1), (9-3), (10-9)] => [2, 6, 1]
         lst = data_list # use a short name: lst
         delta = [
-            lst[i]-lst[i-1]
-            for i in range(1, len(lst))
+            lst[i]-lst[i+1]
+            for i in range(0, len(lst) - 1)
         ]
 
         mean_delta = sum(delta)/len(delta)
-        fitted_data = data_list[-1] + mean_delta
+        fitted_data = data_list[0] + mean_delta
         return fitted_data
 
 
