@@ -762,9 +762,11 @@ def collect_water():
     oracle_adapter.clear()
     mysql_adapter.clear()
 
+
 def collect():
     collect_electricity()
     collect_water()
+
 
 def test_get_equip_name_to_ids():
     oracle_adapter = OracleAdapter(OracleAdapter.get_oracle_conn())
@@ -773,6 +775,7 @@ def test_get_equip_name_to_ids():
     print '##'*50
     print result
     oracle_adapter.clear()
+
 
 def test_get_point_id_type():
     oracle_adapter = OracleAdapter(OracleAdapter.get_oracle_conn())
@@ -785,6 +788,7 @@ def test_get_point_id_type():
             print y
     oracle_adapter.clear()
 
+
 def test_get_point_id_to_value():
     oracle_adapter = OracleAdapter(OracleAdapter.get_oracle_conn())
     ids = ['310109.XH.8001.21719.21','310109.XH.8001.21719.12','310109.XH.8001.21719.9','310109.XH.8001.21719.8','310109.XH.8001.21719.16','310109.XH.8001.21719.3','310109.XH.8001.21719.2','310109.XH.8001.21719.1','310109.XH.8001.21719.10','310109.XH.8001.21248.8','310109.XH.8001.21248.9','310109.XH.8001.21248.1','310109.XH.8001.21248.21','310109.XH.8001.21248.3','310109.XH.8001.21248.16','310109.XH.8001.21248.12','310109.XH.8001.21248.2','310109.XH.8001.21248.10']
@@ -792,6 +796,7 @@ def test_get_point_id_to_value():
     print '##'*50
     print result
     oracle_adapter.clear()
+
 
 def test_get_equip_engery_data_in_batch():
     energy_data_list = []
@@ -807,12 +812,20 @@ def test_get_equip_engery_data_in_batch():
         print e
     oracle_adapter.clear()
 
+
 def test_get_all_water_equip_names():
     mysqladapter = MySqlAdatper(get_mysql_conn())
     names = mysqladapter.get_all_water_equip_names()
     for x in names:
         for k,v in x.items():
             print k,v
+
+
+def test_collect_electricity():
+    print 'DEBUG_MODE:%s' % DEBUG_MODE
+    import time
+    time.sleep(10)
+    collect_electricity()
 
 
 def main():
