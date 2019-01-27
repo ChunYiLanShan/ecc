@@ -676,6 +676,7 @@ def collect_electricity():
 
     fit_tool = datafit.FittingTool(mysqladapter)
     if not OracleAdapter.is_oracle_available():
+        logger.warn("Oracle is unavailable. Try to fit all.")
         fit_tool.fit_all()
         return
 
