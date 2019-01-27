@@ -196,18 +196,27 @@ class FittingTool(object):
                 lambda obj: getattr(obj, field),
                 energy_data_hist_for_single_equip
             )
-            desc_order = all(
-                [
-                    field_vals[i] >= field_vals[i + 1]
-                    for i in xrange(len(field_vals) - 1)
-                ]
-            )
-            if desc_order is not True:
-                err_msg = "ERROR: circuit id %s, its field %s history data is not in desc order. " \
+
+            field_vals_not_none = [e for e in field_vals if e is not None]
+
+            if len(field_vals_not_none) == 0:
+                err_msg = "ERROR: circuit id %s, its field %s history data is None. " \
                       "Data is %s" % (fitted_energy_data.mysql_equip_id, field, field_vals)
-                logger.error(err_msg)
-                raise Exception(err_msg)
-            fitted_val = FittingTool.fit_data(field_vals)
+                logger.warn(err_msg)
+                fitted_val = None
+            else:
+                desc_order = all(
+                    [
+                        field_vals_not_none[i] >= field_vals_not_none[i + 1]
+                        for i in xrange(len(field_vals_not_none) - 1)
+                    ]
+                )
+                if desc_order is not True:
+                    err_msg = "ERROR: circuit id %s, its field %s history data is not in desc order. " \
+                              "Data is %s" % (fitted_energy_data.mysql_equip_id, field, field_vals_not_none)
+                    logger.error(err_msg)
+                    raise Exception(err_msg)
+                fitted_val = FittingTool.fit_data(field_vals_not_none)
             setattr(fitted_energy_data, field, fitted_val)
 
         return fitted_energy_data
@@ -234,8 +243,6 @@ class FittingTool(object):
         mean_delta = sum(delta)/len(delta)
         fitted_data = data_list[0] + mean_delta
         return fitted_data
-
-
 
 
 if __name__ == '__main__':

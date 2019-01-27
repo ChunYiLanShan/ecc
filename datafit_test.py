@@ -12,7 +12,7 @@ class FitToolTest(unittest.TestCase):
                 self.ut_obj = ut_obj
 
             def get_circuit_ids(self):
-                return [1, 2, 3]
+                return [1, 2, 3, 4]
 
             def get_hist_electricity_circuit(self, circuit_id, latest_count):
                 hist_energy_data ={
@@ -82,7 +82,34 @@ class FitToolTest(unittest.TestCase):
                         )
 
                     ],
-                    3: []
+                    3: [],
+                    4:  [
+
+                        FitToolTest._create_enery_data(
+                            voltage_A=None,
+                            voltage_B=None,
+                            voltage_C=2.0,
+                            current_A=2.0,
+                            current_B=2.0,
+                            current_C=2.0,
+                            power=None,
+                            quantity=2.0,
+                            mysql_equip_id=4
+                        ),
+
+                        FitToolTest._create_enery_data(
+                            voltage_A=None,
+                            voltage_B=1.0,
+                            voltage_C=1.0,
+                            current_A=1.0,
+                            current_B=1.0,
+                            current_C=1.0,
+                            power=None,
+                            quantity=1.0,
+                            mysql_equip_id=4
+                        )
+
+                    ]
                 }
                 return hist_energy_data[circuit_id]
         just_collected_energy_data_list = [
@@ -118,6 +145,17 @@ class FitToolTest(unittest.TestCase):
                 power=9.0,
                 quantity=9.0,
                 mysql_equip_id=3
+            ),
+            FitToolTest._create_enery_data(
+                voltage_A=10.0,
+                voltage_B=10.0,
+                voltage_C=10.0,
+                current_A=10.0,
+                current_B=10.0,
+                current_C=10.0,
+                power=10.0,
+                quantity=10.0,
+                mysql_equip_id=4
             )
         ]
         db_conn =  None
@@ -125,6 +163,9 @@ class FitToolTest(unittest.TestCase):
         mysql_adapter.set_ut_obj(self)
         fit_tool = datafit.FittingTool(mysql_adapter)
         adjusted_enery_data = fit_tool.fit_energy_data_when_no_update(just_collected_energy_data_list)
+
+        self.assertEqual(4, len(just_collected_energy_data_list))
+
         first = just_collected_energy_data_list[0]
         self.assertEqual(7.0, first.voltage_A)
         self.assertEqual(3.0, first.voltage_B)
@@ -144,6 +185,9 @@ class FitToolTest(unittest.TestCase):
         self.assertEqual(9.0, third.power)
         self.assertEqual(3, third.mysql_equip_id)
 
+        fourth = just_collected_energy_data_list[3]
+        self.assertEqual(10.0, fourth.voltage_A)
+        self.assertEqual(4, fourth.mysql_equip_id)
         print adjusted_enery_data
 
     def test_fit_all(self):
