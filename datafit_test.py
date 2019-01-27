@@ -318,6 +318,18 @@ class FitToolTest(unittest.TestCase):
         energy_data_hist = [
 
             FitToolTest._create_enery_data(
+                voltage_A=3.0,
+                voltage_B=3.0,
+                voltage_C=3.0,
+                current_A=3.0,
+                current_B=3.0,
+                current_C=3.0,
+                power=3.0,
+                quantity=0.1,
+                mysql_equip_id=1
+            ),
+
+            FitToolTest._create_enery_data(
                 voltage_A=2.0,
                 voltage_B=2.0,
                 voltage_C=2.0,
@@ -349,11 +361,11 @@ class FitToolTest(unittest.TestCase):
             'current_A',
             'current_B',
             'current_C',
-            'power',
-            'quantity'
+            'power'
         ]
         for field in fields:
-            self.assertEqual(3.0, getattr(fitted_data, field))
+            self.assertEqual(4.0, getattr(fitted_data, field))
+        self.assertEqual(0.1, getattr(fitted_data, 'quantity'))
         self.assertEqual(1, fitted_data.mysql_equip_id)
 
 
@@ -373,6 +385,7 @@ class FitToolTest(unittest.TestCase):
 
         # Exception case
         self._fit_data_exception_case(AssertionError, [])
+        self._fit_data_exception_case(Exception, [20, 120, 100])
 
     def _fit_data_case(self, expected, hist_data):
         fitted_data = datafit.FittingTool.fit_data(hist_data)
@@ -380,6 +393,6 @@ class FitToolTest(unittest.TestCase):
 
     def _fit_data_exception_case(self, exception, bad_hist_data):
         with self.assertRaises(exception) as context:
-            self._fit_data_case(-1, [])
+            self._fit_data_case(-1, bad_hist_data)
         self.assertEqual(exception, type(context.exception))
 

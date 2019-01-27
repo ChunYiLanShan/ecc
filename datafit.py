@@ -219,12 +219,21 @@ class FittingTool(object):
                         for i in xrange(len(field_vals_not_none) - 1)
                     ]
                 )
-                if desc_order is not True:
-                    err_msg = "ERROR: circuit id %s, its field %s history data is not in desc order. " \
-                              "Data is %s" % (fitted_energy_data.mysql_equip_id, field, field_vals_not_none)
+                # Not required.
+                # if desc_order is not True:
+                #     err_msg = "ERROR: circuit id %s, its field %s history data is not in desc order. " \
+                #               "Data is %s" % (fitted_energy_data.mysql_equip_id, field, field_vals_not_none)
+                #     logger.error(err_msg)
+                #     raise Exception(err_msg)
+                try:
+                    fitted_val = FittingTool.fit_data(field_vals_not_none)
+                except Exception as e:
+                    err_msg = "Circuit id %s, error when fit its field %s history data . " \
+                              "Data is %s. " \
+                              "error is: %s" % (fitted_energy_data.mysql_equip_id, field, field_vals_not_none, e.message)
                     logger.error(err_msg)
-                    raise Exception(err_msg)
-                fitted_val = FittingTool.fit_data(field_vals_not_none)
+                    fitted_val = field_vals_not_none[0]
+
             setattr(fitted_energy_data, field, fitted_val)
 
         return fitted_energy_data
@@ -232,8 +241,9 @@ class FittingTool(object):
     @staticmethod
     def fit_data(data_list):
         """
-        Pre-condition: data_list is in desc order: data_list[i] >= data_list[i-1].
-                        The first element is the latest data.
+        The data list may not be in desc order, since maybe the fit data is bigger than the next real data.
+        Just to check if the mean of delta is not negative.
+        The first element is the latest data.
         Fit the data using a simple method. Refer to return.
         :param data_list:
         :return:  = data_list[0] + mean(delta(data_list))
@@ -249,6 +259,10 @@ class FittingTool(object):
         ]
 
         mean_delta = sum(delta)/len(delta)
+        if mean_delta < 0:
+            err_msg = 'mean of delta is negative. Data values:%s ' % data_list
+            logger.error(err_msg)
+            raise Exception(err_msg)
         fitted_data = data_list[0] + mean_delta
         return fitted_data
 
