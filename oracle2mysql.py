@@ -2,7 +2,6 @@
 
 from datetime import datetime
 import mysql.connector
-import logging
 import os
 import sys
 import time
@@ -12,17 +11,10 @@ import traceback
 import cx_Oracle
 
 import datafit
+from logutil import logger
 
-logger = logging.getLogger()
-handler = logging.StreamHandler()
-fh = logging.FileHandler('ecc.log')
-formatter = logging.Formatter(
-        '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-handler.setFormatter(formatter)
-fh.setFormatter(formatter)
-logger.addHandler(fh)
-#logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+# If true, not really write data into mysql. A little like DRY-RUN.
+DEBUG_MODE = False
 
 def my_timer(func):
     def wrapper(*args, **kwargs):
@@ -190,6 +182,8 @@ class MySqlAdatper(object):
         values_sql = ",".join(values_list)
         sql += values_sql
         logger.info("SQL for new energy data: %s", sql)
+        if DEBUG_MODE:
+            return
 
         cursor = self.db_conn.cursor()
 
@@ -294,9 +288,6 @@ class WaterEquipEnergyData(object):
         return str(self.__dict__)
 
 
-
-
-
 class OracleAdapter(object):
 
     @staticmethod
@@ -322,11 +313,11 @@ class OracleAdapter(object):
         conn = None
         try:
             conn = OracleAdapter.get_oracle_conn()
-            print 'Oracle is available'
+            logger.info('Oracle is available')
             is_oracle_ok = True
         except Exception:
             logger.error(traceback.format_exc())
-            print 'Error. Oracle is not available.'
+            logger.error('Error. Oracle is not available.')
         finally:
             if conn is not None:
                 conn.close()
@@ -823,6 +814,7 @@ def test_get_all_water_equip_names():
         for k,v in x.items():
             print k,v
 
+
 def main():
     secs=5*60
     if 'ECC_DURATION' in os.environ:
@@ -833,6 +825,7 @@ def main():
         collect()
         logger.info('Sleep %s seconds for next run', secs)
         time.sleep(secs)
+
 
 if __name__ == '__main__':
     main()

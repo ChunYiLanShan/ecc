@@ -32,6 +32,7 @@ For fast query speed, we need the help from concurrency.
 """
 
 import oracle2mysql
+from logutil import logger
 
 
 class MySqlHistLoader(object):
@@ -41,7 +42,7 @@ class MySqlHistLoader(object):
 
     def get_circuit_ids(self):
         circuit_ids = self.mysql_adapter.get_circuit_ids()
-        print "Got circuit_ids: %s" % circuit_ids
+        logger.info("Got circuit_ids: %s" % circuit_ids)
         return circuit_ids
 
     def get_hist_data(self):
@@ -67,6 +68,7 @@ class MySqlHistLoader(object):
         }
         )
         """
+        logger.info("get_hist_data started.")
         circuit_ids_in_mysql = self.get_circuit_ids()
         hist_data = []
         hist_data_dict = {}
@@ -78,15 +80,18 @@ class MySqlHistLoader(object):
 
             hist_data_dict[circuit_id] = hist_energy_data
             hist_data.append(hist_energy_data)
+        logger.info("get_hist_data completed.")
         return hist_data, hist_data_dict
 
 
 class FittingTool(object):
     def __init__(self, mysql_adapter):
+        logger.info("FittingTool.__init__ started.")
         self.mysql_adapter = mysql_adapter
         self.hist_loader = MySqlHistLoader(self.mysql_adapter)
         self.hist_energy_data, self.hist_energy_data_dict = self.hist_loader.get_hist_data()
         self.fitted_energy_data_dict = self.fit_hist_energy_data(self.hist_energy_data_dict)
+        logger.info("FittingTool.__init__ completed.")
 
     def fit_all(self):
         # indexes = self.mysql_adapter.get_all_equip_names()
@@ -99,7 +104,9 @@ class FittingTool(object):
 
         # oracle2mysql.logger.info("Equipments count: %s", len(indexes))
         # Remove None
+        logger.info("fit_all started.")
         self.mysql_adapter.insert_energy_point_data_in_batch(self.fitted_energy_data_dict.values())
+        logger.info("fit_all completed.")
 
     def fit_energy_data_when_no_update(self, equip_energy_data_list):
         """
@@ -107,6 +114,7 @@ class FittingTool(object):
         :param equip_energy_data_list:
         :return:
         """
+        logger.info("fit_energy_data_when_no_update started.")
         for equip_energy_data in equip_energy_data_list:
             for field in oracle2mysql.EquipEnergyData.FIELD_LIST:
                 if FittingTool.need_fit(equip_energy_data, self.hist_energy_data_dict, field):
@@ -119,6 +127,8 @@ class FittingTool(object):
                         field,
                         fitted_field_val
                     )
+        logger.info("fit_energy_data_when_no_update completed.")
+
 
     @staticmethod
     def need_fit(equip_energy_data, hist_energy_data_dict, field_name):
@@ -146,7 +156,7 @@ class FittingTool(object):
         :param hist_energy_data: List of List [ [equip_1_hist_1, equip_1_hist_2], [equip_2_hist_1, equip_2_hist_2],... ]
         :return: key is equip id, value is fitted EquipEnergyData instance.
         """
-
+        logger.info("fit_hist_energy_data started.")
         fitted_enery_data_dict = {
             equip_id: self.fit_energy_data(hist_data)
             for equip_id, hist_data in hist_energy_data_dict.items()
@@ -156,10 +166,11 @@ class FittingTool(object):
         fitted_enery_data_dict_without_none = {}
         for equip_id, fitted_data in fitted_enery_data_dict.items():
             if fitted_data is None:
-                print "No history data for circuit id: %s" % equip_id
+                logger.info("No history data for circuit id: %s" % equip_id)
             else:
                 fitted_enery_data_dict_without_none[equip_id] = fitted_data
 
+        logger.info("fit_hist_energy_data completed.")
         return fitted_enery_data_dict_without_none
 
     @staticmethod
@@ -194,7 +205,7 @@ class FittingTool(object):
             if desc_order is not True:
                 err_msg = "ERROR: circuit id %s, its field %s history data is not in desc order. " \
                       "Data is %s" % (fitted_energy_data.mysql_equip_id, field, field_vals)
-                print err_msg
+                logger.error(err_msg)
                 raise Exception(err_msg)
             fitted_val = FittingTool.fit_data(field_vals)
             setattr(fitted_energy_data, field, fitted_val)
