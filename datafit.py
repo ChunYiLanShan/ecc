@@ -152,8 +152,11 @@ class FittingTool(object):
         
         data_changed = (field_collected_val != field_latest_imported_val)
         if not data_changed:
-            logger.debug("Need fit data for field %s, field_collected_val = field_latest_imported_val = %s" % (field_name, field_collected_val))
-        return (not data_changed)
+            logger.debug(
+                "Need fit data for field %s, field_collected_val = field_latest_imported_val = %s" %
+                (field_name, field_collected_val)
+            )
+        return not data_changed
 
     def fit_hist_energy_data(self, hist_energy_data_dict):
         """
