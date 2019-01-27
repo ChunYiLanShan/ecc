@@ -6,6 +6,7 @@ import logging
 import os
 import sys
 import time
+import traceback
 
 #oracle
 import cx_Oracle
@@ -292,28 +293,44 @@ class WaterEquipEnergyData(object):
     def __str__(self):
         return str(self.__dict__)
 
-def get_oracle_conn():
-    user = os.environ['ORACLE_USER']
-    password = os.environ['ORACLE_PASSWORD']
-    host = os.environ['ORACLE_HOST']
-    port = os.environ['ORACLE_PORT']
-    orcl_inst = os.environ['ORACLE_INSTANCE']
 
-    # select chinese
-    os.environ["NLS_LANG"] = "American_America.ZHS16GBK"
-    # where chinese
-    os.environ["NLS_LANG"] = "AMERICAN_AMERICA.UTF8"
-    # Connect as user "hr" with password "welcome" to the "oraclepdb" service running on this computer.
-    connection = cx_Oracle.connect(user, password, "%s:%s/%s" % (host, port, orcl_inst))
-    return connection
+
 
 
 class OracleAdapter(object):
 
     @staticmethod
+    def get_oracle_conn():
+        user = os.environ['ORACLE_USER']
+        password = os.environ['ORACLE_PASSWORD']
+        host = os.environ['ORACLE_HOST']
+        port = os.environ['ORACLE_PORT']
+        orcl_inst = os.environ['ORACLE_INSTANCE']
+
+        # select chinese
+        os.environ["NLS_LANG"] = "American_America.ZHS16GBK"
+        # where chinese
+        os.environ["NLS_LANG"] = "AMERICAN_AMERICA.UTF8"
+        # Connect as user "hr" with password "welcome" to the "oraclepdb" service running on this computer.
+        connection = cx_Oracle.connect(user, password, "%s:%s/%s" % (host, port, orcl_inst))
+        return connection
+
+    @staticmethod
     def is_oracle_available():
         #TODO
-        return True
+        is_oracle_ok = False
+        conn = None
+        try:
+            conn = OracleAdapter.get_oracle_conn()
+            print 'Oracle is available'
+            is_oracle_ok = True
+        except Exception:
+            logger.error(traceback.format_exc())
+            print 'Error. Oracle is not available.'
+        finally:
+            if conn is not None:
+                conn.close()
+        return is_oracle_ok
 
     def __init__(self, connection):
         self.connection = connection
@@ -680,7 +697,7 @@ def get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list):
 def collect_electricity():
     logger.debug('Start to collect electricity energy data')
     mysqladapter = MySqlAdatper(get_mysql_conn())
-    oracle_adapter = OracleAdapter(get_oracle_conn())
+    oracle_adapter = OracleAdapter(OracleAdapter.get_oracle_conn())
 
     fit_tool = datafit.FittingTool(mysqladapter)
     if not OracleAdapter.is_oracle_available():
@@ -720,7 +737,7 @@ def collect_electricity():
 
 def collect_water():
     mysql_adapter = MySqlAdatper(get_mysql_conn())
-    oracle_adapter = OracleAdapter(get_oracle_conn())
+    oracle_adapter = OracleAdapter(OracleAdapter.get_oracle_conn())
     id_names = mysql_adapter.get_all_water_equip_names()
 
     names = []
@@ -759,7 +776,7 @@ def collect():
     collect_water()
 
 def test_get_equip_name_to_ids():
-    oracle_adapter = OracleAdapter(get_oracle_conn())
+    oracle_adapter = OracleAdapter(OracleAdapter.get_oracle_conn())
     names = [u'门诊楼B1层低配间A1L31柜螺杆机3号PE410R', u'科教楼B1层低配间行政楼空调PE410R']
     result = oracle_adapter.get_equip_name_to_ids(names)
     print '##'*50
@@ -767,7 +784,7 @@ def test_get_equip_name_to_ids():
     oracle_adapter.clear()
 
 def test_get_point_id_type():
-    oracle_adapter = OracleAdapter(get_oracle_conn())
+    oracle_adapter = OracleAdapter(OracleAdapter.get_oracle_conn())
     ids = ['8001.21719', '8001.21248']
     result = oracle_adapter.get_point_id_type(ids)
     print '##'*50
@@ -778,7 +795,7 @@ def test_get_point_id_type():
     oracle_adapter.clear()
 
 def test_get_point_id_to_value():
-    oracle_adapter = OracleAdapter(get_oracle_conn())
+    oracle_adapter = OracleAdapter(OracleAdapter.get_oracle_conn())
     ids = ['310109.XH.8001.21719.21','310109.XH.8001.21719.12','310109.XH.8001.21719.9','310109.XH.8001.21719.8','310109.XH.8001.21719.16','310109.XH.8001.21719.3','310109.XH.8001.21719.2','310109.XH.8001.21719.1','310109.XH.8001.21719.10','310109.XH.8001.21248.8','310109.XH.8001.21248.9','310109.XH.8001.21248.1','310109.XH.8001.21248.21','310109.XH.8001.21248.3','310109.XH.8001.21248.16','310109.XH.8001.21248.12','310109.XH.8001.21248.2','310109.XH.8001.21248.10']
     result = oracle_adapter.get_point_id_to_value(ids)
     print '##'*50
@@ -793,7 +810,7 @@ def test_get_equip_engery_data_in_batch():
     energy_data = EquipEnergyData()
     energy_data.name = u'科教楼B1层低配间行政楼空调PE410R'
     energy_data_list.append(energy_data)
-    oracle_adapter = OracleAdapter(get_oracle_conn())
+    oracle_adapter = OracleAdapter(OracleAdapter.get_oracle_conn())
     get_equip_engery_data_in_batch(oracle_adapter, energy_data_list)
     for e in energy_data_list:
         print e
