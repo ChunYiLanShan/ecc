@@ -1,7 +1,11 @@
 # ecc
 
+# TODO:
+* Log rotate & persistence for issue triage.
+
 # Run
 * `docker run -e ECC_DURATION=1800 -dti ecc`
+
 
 # Entity Model
 * 一个设备会有多个采集点。所以，设备表(EQ_EQUIP)和点表(RTM_POINT)的关系是一对多的关系。

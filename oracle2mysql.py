@@ -45,11 +45,6 @@ class MySqlAdatper(object):
     def __init__(self, db_conn):
         self.db_conn = db_conn
 
-    def new_connection(self):
-        return  mysql.connector.connect(user=self.user, password=self.password,
-                              host=self.host,
-                              database=self.db_name)
-
         '''
     def __init__(self, host, user, password, db_name):
         self.host = host
@@ -61,20 +56,10 @@ class MySqlAdatper(object):
                               database=self.db_name)
                               '''
 
-
-
     def get_all_equip_names(self):
-        
-        logger.debug("connect to mysql database %s at host %s with user %s", self.db_name, self.host, self.user)
-           
-        cnx = mysql.connector.connect(user=self.user, password=self.password,
-                              host=self.host,
-                              database=self.db_name)
-        cursor = cnx.cursor()
 
+        cursor = self.db_conn.cursor()
         query = ("SELECT id, name FROM energymanage_electricity_circuit ORDER BY id")
-
-
         cursor.execute(query)
 
         names = []
@@ -82,7 +67,6 @@ class MySqlAdatper(object):
             index_map = {'id':id, 'name':name}
             names.append(index_map)
         cursor.close()
-        cnx.close()
         return names
 
     def get_all_water_equip_names(self):
