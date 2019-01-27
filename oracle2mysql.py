@@ -14,7 +14,7 @@ import datafit
 from logutil import logger
 
 # If true, not really write data into mysql. A little like DRY-RUN.
-DEBUG_MODE = False
+DEBUG_MODE = True 
 
 def my_timer(func):
     def wrapper(*args, **kwargs):
@@ -825,4 +825,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    test_collect_electricity()
