@@ -672,7 +672,6 @@ def get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list):
 def collect_electricity():
     logger.debug('Start to collect electricity energy data')
     mysqladapter = MySqlAdatper(get_mysql_conn())
-    oracle_adapter = OracleAdapter(OracleAdapter.get_oracle_conn())
 
     fit_tool = datafit.FittingTool(mysqladapter)
     if not OracleAdapter.is_oracle_available():
@@ -680,6 +679,7 @@ def collect_electricity():
         fit_tool.fit_all()
         return
 
+    oracle_adapter = OracleAdapter(OracleAdapter.get_oracle_conn())
     indexes = mysqladapter.get_all_equip_names()
 
     batch_size = 100
