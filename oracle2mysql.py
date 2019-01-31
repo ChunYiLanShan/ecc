@@ -499,8 +499,8 @@ class OracleAdapter(object):
             logger.debug("point_id_lsit %s" % point_id_list)
             logger.debug("rows_list: %s" % rows_list)
             for row_dict in rows_list:
-                point_value = row_dict['record']
-                point_id = row_dict['projectpoint']
+                point_value = row_dict['RECORD']
+                point_id = row_dict['PROJECTPOINT']
                 result[point_id] = point_value
 
             return result
