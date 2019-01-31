@@ -9,6 +9,7 @@ import time
 
 #oracle
 import cx_Oracle
+import sys 
 
 logger = logging.getLogger()
 handler = logging.StreamHandler()
@@ -246,7 +247,7 @@ class OracleAdapter(object):
         # select chinese
         os.environ["NLS_LANG"] = "American_America.ZHS16GBK"
         # where chinese
-        os.environ["NLS_LANG"] = "AMERICAN_AMERICA.UTF8"
+        os.environ["NLS_LANG"] = "AMERICAN_AMERICA.AL32UTF8"
         # Connect as user "hr" with password "welcome" to the "oraclepdb" service running on this computer.
         self.connection = cx_Oracle.connect(self.user, self.password, "%s:%s/%s" % (self.host, self.port, self.orcl_inst))
 
@@ -398,7 +399,7 @@ class OracleAdapter(object):
         names_sql = ','.join(map(lambda e : "'%s'" % e, names))
         sql = """SELECT id, name FROM %s.ec_device_info WHERE name IN (%s)""" \
               % (OracleAdapter.ORACLE_SCHEMA, names_sql)
-        logger.info('SQL:%s', sql)
+        logger.info('SQL for get ec_device_info:%s', sql)
         try:
             cursor = self.connection.cursor()
             i = 0
@@ -406,9 +407,11 @@ class OracleAdapter(object):
             dict_list= self._rows_to_dict_list(cursor)
             result = {}
             for row_dict in dict_list:
-                result[row_dict['name']] = row_dict['id']
+                logger.info(row_dict)
+                result[row_dict['NAME']] = row_dict['ID']
             if len(names) > len(result):
                 logger.warn('Not found some corresponding equip based on name')
+            logger.debug("equip_name_to_ids: %s" % str(result))
             return result
         finally:
             cursor.close()
@@ -574,15 +577,24 @@ def get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list):
     eedl = equip_energy_data_list
     name_to_ids = oracle_adapter.get_equip_name_to_ids([e.name for e in eedl])
     name_to_energy_data = dict(zip([e.name for e in eedl], eedl))
+    for name in name_to_ids.keys():
+        logger.debug(name)
+        decode_name = name.decode('utf-8')
+        logger.debug(decode_name)
+        logger.debug('oralce: %s' % type(decode_name))
+    decode_name_to_ids = {name.decode('utf-8'): id_v for name,id_v in name_to_ids.items()}
+
     for name, energy_data in name_to_energy_data.items():
-        if name in name_to_ids.keys():
-            energy_data.oracle_equip_id = name_to_ids[name]
+        logger.debug('mysql: %s' % type(name))
+        if name in decode_name_to_ids:
+            energy_data.oracle_equip_id = decode_name_to_ids[name]
         else:
             # remove the entry whose name can't be found in oracle.
             pass
             logger.warn("Can't find equip name %s from oracle database.", name)
             eedl.remove(energy_data)
 
+    logger.debug("Size of eedl matching names in mysql: %s" % len(eedl))
     # Get point_id -> point_type
     oracle_equip_id_to_point_id_type = oracle_adapter.get_point_id_type([e.oracle_equip_id for e in eedl])
     oracle_equip_id_to_energy_data = dict(zip([e.oracle_equip_id for e in eedl], eedl))
