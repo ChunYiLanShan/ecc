@@ -213,7 +213,7 @@ class EquipEnergyData(object):
         self.current_A = None
         self.current_B = None
         self.current_C = None
-        self.quatity = None
+        self.quantity = None
         self.power = None 
 
         #mapping data
@@ -448,10 +448,16 @@ class OracleAdapter(object):
                 'power':power_str,
                 'quantity':quatity_str
             }
-            point_name = row_dict['name']
-            point_depict = row_dict['pointdesc']
+            point_name = row_dict['NAME']
+            point_depict = row_dict['POINTDESC']
             for  k,v in mysql_col_name_to_chinese_str.items():
-                if point_name == v or v in point_depict:
+                logger.debug('point_name type: %s' % type(point_name))
+                logger.debug('chinese name: %s' % type(v))
+                logger.debug('point depict: %s' % type(point_depict))
+                logger.debug(point_depict)
+                logger.debug(v)
+                logger.debug(v in  point_depict.decode('utf-8'))
+                if point_name == v or v in point_depict.decode('utf-8'):
                     return True, k
             return False, None
 
@@ -463,8 +469,8 @@ class OracleAdapter(object):
             result = {}
             rows_list = self._rows_to_dict_list(cursor)
             for row_dict in rows_list:
-                equip_id = row_dict['deviceinfo_id']
-                point_id = row_dict['id']
+                equip_id = row_dict['DEVICEINFO_ID']
+                point_id = row_dict['ID']
                 is_need_type, point_type = check_point_type(row_dict)
                 if is_need_type:
                     if equip_id in result:
@@ -484,11 +490,14 @@ class OracleAdapter(object):
         point_ids_sql = ','.join(map(lambda e : "'%s'" % e, point_id_list))
         sql = """SELECT projectpoint, record FROM %s.ec_sdcd_data WHERE projectpoint IN (%s)""" \
               % (OracleAdapter.ORACLE_SCHEMA, point_ids_sql)
+        logger.debug("get_point_id_to_value sql: %s" % sql)
         try:
             cursor = self.connection.cursor()
             cursor.execute(sql)
             result = {}
             rows_list = self._rows_to_dict_list(cursor)
+            logger.debug("point_id_lsit %s" % point_id_list)
+            logger.debug("rows_list: %s" % rows_list)
             for row_dict in rows_list:
                 point_value = row_dict['record']
                 point_id = row_dict['projectpoint']
@@ -629,11 +638,11 @@ def collect_electricity():
     mysqladapter = MySqlAdatper()
     indexes = mysqladapter.get_all_equip_names()
 
-    batch_size = 100
+    batch_size = 50
     import math
-    step_cnt = int(math.ceil(len(indexes)/100.0))
+    step_cnt = int(math.ceil(len(indexes)/(batch_size*1.0)))
     for i in range(step_cnt):
-        batch_indexes = indexes[i*100: (i+1)*100]
+        batch_indexes = indexes[i*batch_size: (i+1)*batch_size]
 
         logger.info("Round : %s, Electricity Equip count: %s", i, len(batch_indexes))
         id_names_str = "\n".join(['\t%s,%s' % (e['id'],e['name']) for e in batch_indexes])
