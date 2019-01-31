@@ -424,7 +424,7 @@ class OracleAdapter(object):
 
         equip_no_list = ','.join(map(lambda e : "'%s'" % e, equip_id_list))
 
-        sql = """SELECT id, name, pointdesc, deviceinfo_id
+        sql = """SELECT id, name, pointdesc, deviceinfo_id, projectpoint
                     FROM %s.ec_point_info WHERE deviceinfo_id IN (%s)""" \
               % (OracleAdapter.ORACLE_SCHEMA, equip_no_list)
         logger.info('SQL for get_point_id_type: %s', sql)
@@ -470,7 +470,7 @@ class OracleAdapter(object):
             rows_list = self._rows_to_dict_list(cursor)
             for row_dict in rows_list:
                 equip_id = row_dict['DEVICEINFO_ID']
-                point_id = row_dict['ID']
+                point_id = row_dict['PROJECTPOINT']
                 is_need_type, point_type = check_point_type(row_dict)
                 if is_need_type:
                     if equip_id in result:
