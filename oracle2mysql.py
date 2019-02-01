@@ -22,7 +22,7 @@ logger.addHandler(fh)
 #logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
-DRY_RUN_MODE = True
+DRY_RUN_MODE = False 
 
 
 def my_timer(func):
