@@ -705,7 +705,8 @@ def collect_water():
 
 def collect():
     collect_electricity()
-    collect_water()
+    #Disable for upgrading to DB 2.5 only for electricity
+    #collect_water()
 
 def test_get_equip_name_to_ids():
     oracle_adapter = OracleAdapter()
@@ -767,4 +768,4 @@ def main():
         time.sleep(secs)
 
 if __name__ == '__main__':
-    collect_electricity()
+    main()
