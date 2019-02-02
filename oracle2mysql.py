@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 from datetime import datetime
+from logging.handlers import TimedRotatingFileHandler
+
 import mysql.connector
 import logging
 import os
@@ -13,14 +15,18 @@ import sys
 
 logger = logging.getLogger()
 handler = logging.StreamHandler()
-fh = logging.FileHandler('ecc.log')
+# fh = logging.FileHandler('ecc.log')
+fh = TimedRotatingFileHandler('/ecc_log/ecc.log',
+                              when="d",
+                              interval=1,
+                              backupCount=14)
 formatter = logging.Formatter(
         '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
 handler.setFormatter(formatter)
 fh.setFormatter(formatter)
 logger.addHandler(fh)
 #logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 DRY_RUN_MODE = False 
 
@@ -756,6 +762,7 @@ def test_get_all_water_equip_names():
         for k,v in x.items():
             print k,v
 
+
 def main():
     secs=5*60
     if 'ECC_DURATION' in os.environ:
@@ -766,6 +773,7 @@ def main():
         collect()
         logger.info('Sleep %s seconds for next run', secs)
         time.sleep(secs)
+
 
 if __name__ == '__main__':
     main()
