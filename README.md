@@ -1,7 +1,7 @@
 # ecc
 
 # Build
-* `docker build -t ecc .`
+* `docker build -t ecc_change-for-db2.5 .`
 # Run
 * `docker run -e ECC_DURATION=1800 -dti ecc`
 * For production: `docker run --name ecc_prod -dti -v /etc/localtime:/etc/localtime:ro  -v /var/log/ecc:/ecc_log ecc_change-for-db2.5`

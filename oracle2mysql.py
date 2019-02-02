@@ -648,7 +648,7 @@ def collect_electricity():
     mysqladapter = MySqlAdatper()
     indexes = mysqladapter.get_all_equip_names()
 
-    batch_size = 50
+    batch_size = 100
     import math
     step_cnt = int(math.ceil(len(indexes)/(batch_size*1.0)))
     for i in range(step_cnt):
