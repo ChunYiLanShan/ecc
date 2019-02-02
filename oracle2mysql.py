@@ -508,6 +508,10 @@ class OracleAdapter(object):
                 point_value = row_dict['RECORD']
                 point_id = row_dict['PROJECTPOINT']
                 result[point_id] = point_value
+            for point_id_in_para in point_id_list:
+                point_ids_got = result.keys()
+                if point_id_in_para not in point_ids_got:
+                    logger.warn("Not found point value for point id %s" % point_id_in_para)
 
             return result
         finally:
