@@ -648,7 +648,7 @@ def collect_electricity():
     mysqladapter = MySqlAdatper()
     indexes = mysqladapter.get_all_equip_names()
 
-    batch_size = 100
+    batch_size = 50
     import math
     step_cnt = int(math.ceil(len(indexes)/(batch_size*1.0)))
     for i in range(step_cnt):
@@ -780,4 +780,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        logger.exception(e)
+        exit(1)
