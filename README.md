@@ -10,6 +10,8 @@
 # 如何记日志
 * 是不是也可以用自然语言描述一下，我关注的整个数据收集过程的整体状况，和关键节点。 从而判断出我该记什么日志。
 
+# 抓出Oracle的问题
+* 利用conn_oracle.py
 
 # Notes:
 * You have to prepare instantclient\_18\_3
