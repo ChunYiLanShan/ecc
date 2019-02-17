@@ -15,18 +15,22 @@ import sys
 
 logger = logging.getLogger()
 handler = logging.StreamHandler()
-# fh = logging.FileHandler('ecc.log')
-fh = TimedRotatingFileHandler('/ecc_log/ecc.log',
-                              when="d",
-                              interval=1,
-                              backupCount=14)
+fh = logging.FileHandler('ecc.log')
+prod_log_file_path = '/ecc_log/ecc.log'
+
+if os.path.isfile(prod_log_file_path):
+    fh = TimedRotatingFileHandler(prod_log_file_path,
+                                  when="d",
+                                  interval=1,
+                                  backupCount=14)
+
 formatter = logging.Formatter(
         '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
 handler.setFormatter(formatter)
 fh.setFormatter(formatter)
 logger.addHandler(fh)
 #logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 DRY_RUN_MODE = False 
 
@@ -422,6 +426,42 @@ class OracleAdapter(object):
         finally:
             cursor.close()
 
+    @staticmethod
+    def check_point_type(row_dict):
+        voltage_a_str = u'A相电压'
+        voltage_b_str = u'B相电压'
+        voltage_c_str = u'C相电压'
+        current_a_str = u'A相电流'
+        current_b_str = u'B相电流'
+        current_c_str = u'C相电流'
+        power_str = u'有功功率'
+        quatity_str = u'有功功耗'
+        mysql_col_name_to_chinese_str = {
+            'voltage_A':voltage_a_str,
+            'voltage_B':voltage_b_str,
+            'voltage_C':voltage_c_str,
+            'current_A':current_a_str,
+            'current_B':current_b_str,
+            'current_C':current_c_str,
+            'power':power_str,
+            'quantity':quatity_str
+        }
+        point_name = row_dict['NAME']
+        point_depict = row_dict['POINTDESC']
+        if point_name is not None :
+            point_name = point_name.strip()
+        if point_depict is not None:
+            point_depict = point_depict.strip()
+
+        logger.debug("point_name: %s, point_depict: %s." % (point_name, point_depict))
+        for point_type_in_mysql, chinese_str in mysql_col_name_to_chinese_str.items():
+            if point_name == chinese_str \
+                    or point_depict.decode('utf-8').endswith(chinese_str):
+                logger.debug("Got point type: %s" % point_type_in_mysql)
+                return True, point_type_in_mysql
+        logger.warn("Not get point type for point_depict: %s" % point_depict)
+        return False, None
+
     def get_point_id_type(self, equip_id_list):
         '''
         input: ['type.id', 'type.id',...]
@@ -435,39 +475,6 @@ class OracleAdapter(object):
               % (OracleAdapter.ORACLE_SCHEMA, equip_no_list)
         logger.info('SQL for get_point_id_type: %s', sql)
 
-        def check_point_type(row_dict):
-            voltage_a_str = u'A相电压'
-            voltage_b_str = u'B相电压'
-            voltage_c_str = u'C相电压'
-            current_a_str = u'A相电流'
-            current_b_str = u'B相电流'
-            current_c_str = u'C相电流'
-            power_str = u'有功功率'
-            quatity_str = u'有功功耗'
-            mysql_col_name_to_chinese_str = {
-                'voltage_A':voltage_a_str,
-                'voltage_B':voltage_b_str,
-                'voltage_C':voltage_c_str,
-                'current_A':current_a_str,
-                'current_B':current_b_str,
-                'current_C':current_c_str,
-                'power':power_str,
-                'quantity':quatity_str
-            }
-            point_name = row_dict['NAME']
-            point_depict = row_dict['POINTDESC']
-            for  k,v in mysql_col_name_to_chinese_str.items():
-                logger.debug('point_name type: %s' % type(point_name))
-                logger.debug('chinese name: %s' % type(v))
-                logger.debug('point depict: %s' % type(point_depict))
-                logger.debug(point_depict)
-                logger.debug(v)
-                logger.debug(v in  point_depict.decode('utf-8'))
-                if point_name == v or v in point_depict.decode('utf-8'):
-                    return True, k
-            return False, None
-
-
         try:
             cursor = self.connection.cursor()
             i = 0
@@ -477,7 +484,7 @@ class OracleAdapter(object):
             for row_dict in rows_list:
                 equip_id = row_dict['DEVICEINFO_ID']
                 point_id = row_dict['PROJECTPOINT']
-                is_need_type, point_type = check_point_type(row_dict)
+                is_need_type, point_type = OracleAdapter.check_point_type(row_dict)
                 if is_need_type:
                     if equip_id in result:
                         point_id_to_type = result[equip_id]
