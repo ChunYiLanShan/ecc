@@ -89,6 +89,7 @@ class MySqlAdatper(object):
         sql_query = '''SELECT id, circuit_id, time, voltage_A, voltage_B, voltage_C, current_A, current_B, current_C, power, quantity 
                         FROM energymanage_electricity_circuit_monitor_data 
                         WHERE circuit_id = %s ORDER BY time DESC LIMIT %s''' % (circuit_id, latest_count)
+        logger.info("Query history data from MySQL for equip with circuit_id: %s, sql: %s." % (circuit_id, sql_query))
         cursor = self.db_conn.cursor()
         cursor.execute(sql_query)
         hist_energy_data_list = []
