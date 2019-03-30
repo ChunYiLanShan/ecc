@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 from datetime import datetime
+from logging.handlers import TimedRotatingFileHandler
+
 import mysql.connector
 import logging
 import os
@@ -9,10 +11,19 @@ import time
 
 #oracle
 import cx_Oracle
+import sys 
 
 logger = logging.getLogger()
 handler = logging.StreamHandler()
 fh = logging.FileHandler('ecc.log')
+prod_log_file_path = '/ecc_log/ecc.log'
+
+if os.path.isfile(prod_log_file_path):
+    fh = TimedRotatingFileHandler(prod_log_file_path,
+                                  when="d",
+                                  interval=1,
+                                  backupCount=14)
+
 formatter = logging.Formatter(
         '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
 handler.setFormatter(formatter)
@@ -20,6 +31,9 @@ fh.setFormatter(formatter)
 logger.addHandler(fh)
 #logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
+
+DRY_RUN_MODE = False 
+
 
 def my_timer(func):
     def wrapper(*args, **kwargs):
@@ -149,6 +163,8 @@ class MySqlAdatper(object):
         values_sql = ",".join(values_list)
         sql += values_sql
         logger.info("SQL for new energy data: %s", sql)
+        if DRY_RUN_MODE:
+            return
 
 
         cursor = self.db_conn.cursor()
@@ -207,7 +223,7 @@ class EquipEnergyData(object):
         self.current_A = None
         self.current_B = None
         self.current_C = None
-        self.quatity = None
+        self.quantity = None
         self.power = None 
 
         #mapping data
@@ -227,14 +243,10 @@ class WaterEquipEnergyData(object):
     def __str__(self):
         return str(self.__dict__)
 
-class OracleAdapter(object):
 
-    def __init__(self, host, port, orcl_inst, user, password):
-        self.host = host
-        self.port = port
-        self.orcl_inst = orcl_inst
-        self.user = user
-        self.password = password
+class OracleAdapter(object):
+    ORACLE_SCHEMA = "xh"
+
     def __init__(self):
         self.user = os.environ['ORACLE_USER']
         self.password = os.environ['ORACLE_PASSWORD']
@@ -245,7 +257,7 @@ class OracleAdapter(object):
         # select chinese
         os.environ["NLS_LANG"] = "American_America.ZHS16GBK"
         # where chinese
-        os.environ["NLS_LANG"] = "AMERICAN_AMERICA.UTF8"
+        os.environ["NLS_LANG"] = "AMERICAN_AMERICA.AL32UTF8"
         # Connect as user "hr" with password "welcome" to the "oraclepdb" service running on this computer.
         self.connection = cx_Oracle.connect(self.user, self.password, "%s:%s/%s" % (self.host, self.port, self.orcl_inst))
 
@@ -371,11 +383,11 @@ class OracleAdapter(object):
         finally:
             cursor.close()
 
-
     def get_equip_id_and_type(self, name):
-        sql = """SELECT EQUIP_ID, EQUIP_TYPE_ID FROM hqliss1.EQ_EQUIP WHERE equip_name = '%s'""" % name
+        sql = """SELECT EQUIP_ID, EQUIP_TYPE_ID FROM %s.EC_DEVICE_INFO WHERE equip_name = '%s'""" \
+              % (OracleAdapter.ORACLE_SCHEMA, name)
 
-
+        cursor = None
         try:
             cursor = self.connection.cursor()
             i = 0
@@ -387,15 +399,17 @@ class OracleAdapter(object):
             assert i == 1
             return result
         finally:
-            cursor.close()
+            if cursor is not None:
+                cursor.close()
 
     def get_equip_name_to_ids(self, names):
         '''
         return {'name':'id', ...}
         '''
         names_sql = ','.join(map(lambda e : "'%s'" % e, names))
-        sql = """SELECT EQUIP_ID, EQUIP_TYPE_ID, EQUIP_NAME FROM hqliss1.EQ_EQUIP WHERE equip_name IN (%s)""" % names_sql 
-        logger.info('SQL:%s', sql)
+        sql = """SELECT id, name FROM %s.ec_device_info WHERE name IN (%s)""" \
+              % (OracleAdapter.ORACLE_SCHEMA, names_sql)
+        logger.info('SQL for get ec_device_info:%s', sql)
         try:
             cursor = self.connection.cursor()
             i = 0
@@ -403,12 +417,50 @@ class OracleAdapter(object):
             dict_list= self._rows_to_dict_list(cursor)
             result = {}
             for row_dict in dict_list:
-                result[row_dict['EQUIP_NAME']] = '%s.%s' % (row_dict['EQUIP_TYPE_ID'], row_dict['EQUIP_ID'])
+                logger.info(row_dict)
+                result[row_dict['NAME']] = row_dict['ID']
             if len(names) > len(result):
                 logger.warn('Not found some corresponding equip based on name')
+            logger.debug("equip_name_to_ids: %s" % str(result))
             return result
         finally:
             cursor.close()
+
+    @staticmethod
+    def check_point_type(row_dict):
+        voltage_a_str = u'A相电压'
+        voltage_b_str = u'B相电压'
+        voltage_c_str = u'C相电压'
+        current_a_str = u'A相电流'
+        current_b_str = u'B相电流'
+        current_c_str = u'C相电流'
+        power_str = u'有功功率'
+        quatity_str = u'有功功耗'
+        mysql_col_name_to_chinese_str = {
+            'voltage_A':voltage_a_str,
+            'voltage_B':voltage_b_str,
+            'voltage_C':voltage_c_str,
+            'current_A':current_a_str,
+            'current_B':current_b_str,
+            'current_C':current_c_str,
+            'power':power_str,
+            'quantity':quatity_str
+        }
+        point_name = row_dict['NAME']
+        point_depict = row_dict['POINTDESC']
+        if point_name is not None :
+            point_name = point_name.strip()
+        if point_depict is not None:
+            point_depict = point_depict.strip()
+
+        logger.debug("point_name: %s, point_depict: %s." % (point_name, point_depict))
+        for point_type_in_mysql, chinese_str in mysql_col_name_to_chinese_str.items():
+            if point_name == chinese_str \
+                    or point_depict.decode('utf-8').endswith(chinese_str):
+                logger.debug("Got point type: %s" % point_type_in_mysql)
+                return True, point_type_in_mysql
+        logger.warn("Not get point type for point_depict: %s" % point_depict)
+        return False, None
 
     def get_point_id_type(self, equip_id_list):
         '''
@@ -418,35 +470,10 @@ class OracleAdapter(object):
 
         equip_no_list = ','.join(map(lambda e : "'%s'" % e, equip_id_list))
 
-        sql = """SELECT point_id, point_name, short_code, depict, equip_no FROM hqliss1.RTM_POINT WHERE equip_no IN (%s)""" % equip_no_list 
+        sql = """SELECT id, name, pointdesc, deviceinfo_id, projectpoint
+                    FROM %s.ec_point_info WHERE deviceinfo_id IN (%s)""" \
+              % (OracleAdapter.ORACLE_SCHEMA, equip_no_list)
         logger.info('SQL for get_point_id_type: %s', sql)
-
-        def check_point_type(row_dict):
-            voltage_a_str = u'A相电压'
-            voltage_b_str = u'B相电压'
-            voltage_c_str = u'C相电压'
-            current_a_str = u'A相电流'
-            current_b_str = u'B相电流'
-            current_c_str = u'C相电流'
-            power_str = u'有功功率'
-            quatity_str = u'有功功耗'
-            mysql_col_name_to_chinese_str = {
-                'voltage_A':voltage_a_str,
-                'voltage_B':voltage_b_str,
-                'voltage_C':voltage_c_str,
-                'current_A':current_a_str,
-                'current_B':current_b_str,
-                'current_C':current_c_str,
-                'power':power_str,
-                'quantity':quatity_str
-            }
-            point_name = row_dict['POINT_NAME']
-            point_depict = row_dict['DEPICT']
-            for  k,v in mysql_col_name_to_chinese_str.items():
-                if point_name == v or v in point_depict:
-                    return True, k
-            return False, None
-
 
         try:
             cursor = self.connection.cursor()
@@ -455,12 +482,11 @@ class OracleAdapter(object):
             result = {}
             rows_list = self._rows_to_dict_list(cursor)
             for row_dict in rows_list:
-                equip_id = row_dict['EQUIP_NO']
-                point_id = row_dict['POINT_ID']
-                is_need_type, point_type = check_point_type(row_dict)
+                equip_id = row_dict['DEVICEINFO_ID']
+                point_id = row_dict['PROJECTPOINT']
+                is_need_type, point_type = OracleAdapter.check_point_type(row_dict)
                 if is_need_type:
                     if equip_id in result:
-                        pass
                         point_id_to_type = result[equip_id]
                         point_id_to_type[point_id] = point_type
                     else:
@@ -475,16 +501,24 @@ class OracleAdapter(object):
         return {'point_id':'value', ... }
         '''
         point_ids_sql = ','.join(map(lambda e : "'%s'" % e, point_id_list))
-        sql = """SELECT POINT_ID, RECORD FROM hqliss1.RTM_CONTROLDATA WHERE POINT_ID IN (%s)""" % point_ids_sql 
+        sql = """SELECT projectpoint, record FROM %s.ec_sdcd_data WHERE projectpoint IN (%s)""" \
+              % (OracleAdapter.ORACLE_SCHEMA, point_ids_sql)
+        logger.debug("get_point_id_to_value sql: %s" % sql)
         try:
             cursor = self.connection.cursor()
             cursor.execute(sql)
             result = {}
             rows_list = self._rows_to_dict_list(cursor)
+            logger.debug("point_id_lsit %s" % point_id_list)
+            logger.debug("rows_list: %s" % rows_list)
             for row_dict in rows_list:
                 point_value = row_dict['RECORD']
-                point_id = row_dict['POINT_ID']
+                point_id = row_dict['PROJECTPOINT']
                 result[point_id] = point_value
+            for point_id_in_para in point_id_list:
+                point_ids_got = result.keys()
+                if point_id_in_para not in point_ids_got:
+                    logger.warn("Not found point value for point id %s" % point_id_in_para)
 
             return result
         finally:
@@ -569,15 +603,24 @@ def get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list):
     eedl = equip_energy_data_list
     name_to_ids = oracle_adapter.get_equip_name_to_ids([e.name for e in eedl])
     name_to_energy_data = dict(zip([e.name for e in eedl], eedl))
-    for k, v in name_to_energy_data.items():
-        if k in name_to_ids.keys(): 
-            v.oracle_equip_id = name_to_ids[k]
+    for name in name_to_ids.keys():
+        logger.debug(name)
+        decode_name = name.decode('utf-8')
+        logger.debug(decode_name)
+        logger.debug('oralce: %s' % type(decode_name))
+    decode_name_to_ids = {name.decode('utf-8'): id_v for name,id_v in name_to_ids.items()}
+
+    for name, energy_data in name_to_energy_data.items():
+        logger.debug('mysql: %s' % type(name))
+        if name in decode_name_to_ids:
+            energy_data.oracle_equip_id = decode_name_to_ids[name]
         else:
             # remove the entry whose name can't be found in oracle.
             pass
-            logger.warn("Can't find equip name %s from oracle database.", k)
-            eedl.remove(v)
+            logger.warn("Can't find equip name %s from oracle database.", name)
+            eedl.remove(energy_data)
 
+    logger.debug("Size of eedl matching names in mysql: %s" % len(eedl))
     # Get point_id -> point_type
     oracle_equip_id_to_point_id_type = oracle_adapter.get_point_id_type([e.oracle_equip_id for e in eedl])
     oracle_equip_id_to_energy_data = dict(zip([e.oracle_equip_id for e in eedl], eedl))
@@ -585,14 +628,13 @@ def get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list):
         if oracle_equip_id in oracle_equip_id_to_point_id_type.keys():
             energy_data.point_id_to_type = oracle_equip_id_to_point_id_type[oracle_equip_id]
         else:
-            pass
             logger.warn("Can't find equip number %s in rtm_point.", oracle_equip_id)
             eedl.remove(oracle_equip_id_to_energy_data[oracle_equip_id])
 
     # Get point value and update to energy data
     point_id_list = []
-    for k,v in oracle_equip_id_to_point_id_type.items():
-        point_id_list += v.keys()
+    for equip_id, point_id_to_point_type in oracle_equip_id_to_point_id_type.items():
+        point_id_list += point_id_to_point_type.keys()
 
     point_id_to_value = oracle_adapter.get_point_id_to_value(point_id_list)
     point_id_to_energy_data = {}
@@ -613,13 +655,12 @@ def collect_electricity():
     mysqladapter = MySqlAdatper()
     indexes = mysqladapter.get_all_equip_names()
 
-    batch_size = 100
+    batch_size = 50
     import math
-    step_cnt = int(math.ceil(len(indexes)/100.0))
+    step_cnt = int(math.ceil(len(indexes)/(batch_size*1.0)))
     for i in range(step_cnt):
-        batch_indexes = indexes[i*100: (i+1)*100]
+        batch_indexes = indexes[i*batch_size: (i+1)*batch_size]
 
-        
         logger.info("Round : %s, Electricity Equip count: %s", i, len(batch_indexes))
         id_names_str = "\n".join(['\t%s,%s' % (e['id'],e['name']) for e in batch_indexes])
         logger.info("Collect data for %s", id_names_str)
@@ -632,7 +673,6 @@ def collect_electricity():
             equip_energy_data.mysql_equip_id = id_type_pair['id']
             equip_energy_data.name = id_type_pair['name']
             equip_energy_data_list.append(equip_energy_data)
-
 
         logger.info("Equipments count: %s", len(indexes))
 
@@ -657,8 +697,7 @@ def collect_water():
         equip_energy_data.name = id_name_pair['name']
         names.append(id_name_pair['name'])
         eedl.append(equip_energy_data)
-    
-    
+
     logger.info("Equipments count: %s", len(eedl))
 
     name_to_equip_id = oracle_adapter.get_equip_ids_from_water_equip_names(names)
@@ -683,7 +722,8 @@ def collect_water():
 
 def collect():
     collect_electricity()
-    collect_water()
+    #Disable for upgrading to DB 2.5 only for electricity
+    #collect_water()
 
 def test_get_equip_name_to_ids():
     oracle_adapter = OracleAdapter()
@@ -733,6 +773,7 @@ def test_get_all_water_equip_names():
         for k,v in x.items():
             print k,v
 
+
 def main():
     secs=5*60
     if 'ECC_DURATION' in os.environ:
@@ -744,5 +785,10 @@ def main():
         logger.info('Sleep %s seconds for next run', secs)
         time.sleep(secs)
 
+
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        logger.exception(e)
+        exit(1)

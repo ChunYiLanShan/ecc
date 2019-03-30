@@ -1,5 +1,6 @@
 venv
 .idea
 *.log
+*.pyc
 instantclient_18_3
 connection_info.sh
