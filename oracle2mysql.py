@@ -1,38 +1,18 @@
 # -*- coding: utf-8 -*-
-
+import traceback
 from datetime import datetime
-from logging.handlers import TimedRotatingFileHandler
 
 import mysql.connector
-import logging
 import os
-import sys
 import time
 
-#oracle
 import cx_Oracle
-import sys 
+import sys
 
-logger = logging.getLogger()
-handler = logging.StreamHandler()
-fh = logging.FileHandler('ecc.log')
-prod_log_file_path = '/ecc_log/ecc.log'
+import datafit
+from logutil import logger
 
-if os.path.isfile(prod_log_file_path):
-    fh = TimedRotatingFileHandler(prod_log_file_path,
-                                  when="d",
-                                  interval=1,
-                                  backupCount=14)
-
-formatter = logging.Formatter(
-        '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-handler.setFormatter(formatter)
-fh.setFormatter(formatter)
-logger.addHandler(fh)
-#logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
-
-DRY_RUN_MODE = False 
+DRY_RUN_MODE = False
 
 
 def my_timer(func):
@@ -45,40 +25,29 @@ def my_timer(func):
 
     return wrapper
 
+def get_mysql_conn():
+    host = os.environ['MYSQL_HOST']
+    user = os.environ['MYSQL_USER']
+    password = os.environ['MYSQL_PASSWORD']
+    db_name = os.environ['MYSQL_DATABASE']
+    return mysql.connector.connect(
+        user=user,
+        password=password,
+        host=host,
+        database=db_name
+    )
+
 
 class MySqlAdatper(object):
 
-
-    def __init__(self):
-        self.host = os.environ['MYSQL_HOST']
-        self.user = os.environ['MYSQL_USER']
-        self.password = os.environ['MYSQL_PASSWORD']
-        self.db_name = os.environ['MYSQL_DATABASE']
-        self.db_conn = mysql.connector.connect(user=self.user, password=self.password,
-                              host=self.host,
-                              database=self.db_name)
-        
-        '''
-    def __init__(self, host, user, password, db_name):
-        self.host = host
-        self.user = user
-        self.password = password
-        self.db_name = db_name
-        self.db_conn = mysql.connector.connect(user=self.user, password=self.password,
-                              host=self.host,
-                              database=self.db_name)
-                              '''
-
-
+    def __init__(self, db_conn):
+        self.db_conn = db_conn
 
     def get_all_equip_names(self):
         
         logger.debug("connect to mysql database %s at host %s with user %s", self.db_name, self.host, self.user)
-           
-        cnx = mysql.connector.connect(user=self.user, password=self.password,
-                              host=self.host,
-                              database=self.db_name)
-        cursor = cnx.cursor()
+
+        cursor = self.db_conn.cursor()
 
         query = ("SELECT id, name FROM energymanage_electricity_circuit ORDER BY id")
 
@@ -90,7 +59,6 @@ class MySqlAdatper(object):
             index_map = {'id':id, 'name':name}
             names.append(index_map)
         cursor.close()
-        cnx.close()
         return names
 
     def get_all_water_equip_names(self):
@@ -107,7 +75,35 @@ class MySqlAdatper(object):
             names.append(index_map)
         cursor.close()
         return names
-        
+
+    def get_circuit_ids(self):
+        cursor = self.db_conn.cursor()
+        cursor.execute("select id from energymanage_electricity_circuit")
+        try:
+            return [circuit_id for (circuit_id,) in cursor]
+        finally:
+            cursor.close()
+
+    def get_hist_electricity_circuit(self, circuit_id, latest_count):
+        sql_query = '''SELECT id, circuit_id, time, voltage_A, voltage_B, voltage_C, current_A, current_B, current_C, power, quantity 
+                        FROM energymanage_electricity_circuit_monitor_data 
+                        WHERE circuit_id = %s ORDER BY time DESC LIMIT %s''' % (circuit_id, latest_count)
+        cursor = self.db_conn.cursor()
+        cursor.execute(sql_query)
+        hist_energy_data_list = []
+        try:
+            row_dict_list = self._rows_to_dict_list(cursor)
+            for row_dict in row_dict_list:
+                hist_energy_data_list.append(
+                    EquipEnergyData.build_from_dict(
+                        row_dict['circuit_id'],
+                        row_dict
+                    )
+                )
+
+        finally:
+            cursor.close()
+        return hist_energy_data_list
 
     def insert_energy_point_data(self, equip_energy_data):
         add_energy = ("INSERT INTO energymanage_electricity_circuit_monitor_data"
@@ -210,9 +206,34 @@ class MySqlAdatper(object):
 
     def clear(self):
         self.db_conn.close()
+
+    # TODO: Dedup this method in OracleAdapter
+    def _rows_to_dict_list(self, cursor):
+        columns = [i[0] for i in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor]
         
 
 class EquipEnergyData(object):
+    FIELD_LIST = [
+        'voltage_A',
+        'voltage_B',
+        'voltage_C',
+        'current_A',
+        'current_B',
+        'current_C',
+        'power',
+        'quantity'
+    ]
+
+    @staticmethod
+    def build_from_dict(mysql_equip_id, prop_to_value):
+        energy_data = EquipEnergyData()
+        energy_data.mysql_equip_id = mysql_equip_id
+        for field in EquipEnergyData.FIELD_LIST:
+            if field in prop_to_value.keys():
+                setattr(energy_data, field, prop_to_value[field])
+        return energy_data
+
     def __init__(self):
         self.mysql_equip_id = None
         self.oracle_equip_id = None
@@ -247,19 +268,41 @@ class WaterEquipEnergyData(object):
 class OracleAdapter(object):
     ORACLE_SCHEMA = "xh"
 
-    def __init__(self):
-        self.user = os.environ['ORACLE_USER']
-        self.password = os.environ['ORACLE_PASSWORD']
-        self.host=os.environ['ORACLE_HOST']
-        self.port=os.environ['ORACLE_PORT']
-        self.orcl_inst=os.environ['ORACLE_INSTANCE']
+    @staticmethod
+    def get_oracle_conn():
+        user = os.environ['ORACLE_USER']
+        password = os.environ['ORACLE_PASSWORD']
+        host = os.environ['ORACLE_HOST']
+        port = os.environ['ORACLE_PORT']
+        orcl_inst = os.environ['ORACLE_INSTANCE']
 
         # select chinese
         os.environ["NLS_LANG"] = "American_America.ZHS16GBK"
         # where chinese
-        os.environ["NLS_LANG"] = "AMERICAN_AMERICA.AL32UTF8"
+        os.environ["NLS_LANG"] = "AMERICAN_AMERICA.UTF8"
         # Connect as user "hr" with password "welcome" to the "oraclepdb" service running on this computer.
-        self.connection = cx_Oracle.connect(self.user, self.password, "%s:%s/%s" % (self.host, self.port, self.orcl_inst))
+        connection = cx_Oracle.connect(user, password, "%s:%s/%s" % (host, port, orcl_inst))
+        return connection
+
+    @staticmethod
+    def is_oracle_available():
+        #TODO
+        is_oracle_ok = False
+        conn = None
+        try:
+            conn = OracleAdapter.get_oracle_conn()
+            logger.info('Oracle is available')
+            is_oracle_ok = True
+        except Exception:
+            logger.error(traceback.format_exc())
+            logger.error('Error. Oracle is not available.')
+        finally:
+            if conn is not None:
+                conn.close()
+        return is_oracle_ok
+
+    def __init__(self, connection):
+        self.connection = connection
 
     def _exe_sql(self, cursor, sql):
         cursor.execute(sql)
@@ -648,11 +691,19 @@ def get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list):
         setattr(e, e.point_id_to_type[point_id], point_value)
 
 
-
 @my_timer
 def collect_electricity():
     logger.debug('Start to collect electricity enegery data')
-    mysqladapter = MySqlAdatper()
+    mysqladapter = MySqlAdatper(get_mysql_conn())
+
+    fit_tool = datafit.FittingTool(mysqladapter)
+    if not OracleAdapter.is_oracle_available():
+        logger.warn("Oracle is unavailable. Try to fit all.")
+        fit_tool.fit_all()
+        return
+
+    oracle_adapter = OracleAdapter(OracleAdapter.get_oracle_conn())
+
     indexes = mysqladapter.get_all_equip_names()
 
     batch_size = 50
@@ -678,15 +729,17 @@ def collect_electricity():
 
         oracle_adapter = OracleAdapter()
         get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list)
+        fit_tool.fit_energy_data_when_no_update(equip_energy_data_list)
         mysqladapter.insert_energy_point_data_in_batch(equip_energy_data_list)
         logger.info("Round : %s complete in %s seconds", i, time.time() - start)
 
     oracle_adapter.clear()
     mysqladapter.clear()
 
+
 def collect_water():
-    mysql_adapter = MySqlAdatper()
-    oracle_adapter = OracleAdapter()
+    mysql_adapter = MySqlAdatper(get_mysql_conn())
+    oracle_adapter = OracleAdapter(OracleAdapter.get_oracle_conn())
     id_names = mysql_adapter.get_all_water_equip_names()
 
     names = []
@@ -726,7 +779,7 @@ def collect():
     #collect_water()
 
 def test_get_equip_name_to_ids():
-    oracle_adapter = OracleAdapter()
+    oracle_adapter = OracleAdapter(OracleAdapter.get_oracle_conn())
     names = [u'门诊楼B1层低配间A1L31柜螺杆机3号PE410R', u'科教楼B1层低配间行政楼空调PE410R']
     result = oracle_adapter.get_equip_name_to_ids(names)
     print '##'*50
@@ -734,7 +787,7 @@ def test_get_equip_name_to_ids():
     oracle_adapter.clear()
 
 def test_get_point_id_type():
-    oracle_adapter = OracleAdapter()
+    oracle_adapter = OracleAdapter(OracleAdapter.get_oracle_conn())
     ids = ['8001.21719', '8001.21248']
     result = oracle_adapter.get_point_id_type(ids)
     print '##'*50
@@ -745,7 +798,7 @@ def test_get_point_id_type():
     oracle_adapter.clear()
 
 def test_get_point_id_to_value():
-    oracle_adapter = OracleAdapter()
+    oracle_adapter = OracleAdapter(OracleAdapter.get_oracle_conn())
     ids = ['310109.XH.8001.21719.21','310109.XH.8001.21719.12','310109.XH.8001.21719.9','310109.XH.8001.21719.8','310109.XH.8001.21719.16','310109.XH.8001.21719.3','310109.XH.8001.21719.2','310109.XH.8001.21719.1','310109.XH.8001.21719.10','310109.XH.8001.21248.8','310109.XH.8001.21248.9','310109.XH.8001.21248.1','310109.XH.8001.21248.21','310109.XH.8001.21248.3','310109.XH.8001.21248.16','310109.XH.8001.21248.12','310109.XH.8001.21248.2','310109.XH.8001.21248.10']
     result = oracle_adapter.get_point_id_to_value(ids)
     print '##'*50
@@ -760,18 +813,24 @@ def test_get_equip_engery_data_in_batch():
     energy_data = EquipEnergyData()
     energy_data.name = u'科教楼B1层低配间行政楼空调PE410R'
     energy_data_list.append(energy_data)
-    oracle_adapter = OracleAdapter()
+    oracle_adapter = OracleAdapter(OracleAdapter.get_oracle_conn())
     get_equip_engery_data_in_batch(oracle_adapter, energy_data_list)
     for e in energy_data_list:
         print e
     oracle_adapter.clear()
 
 def test_get_all_water_equip_names():
-    mysqladapter = MySqlAdatper()
+    mysqladapter = MySqlAdatper(get_mysql_conn())
     names = mysqladapter.get_all_water_equip_names()
     for x in names:
         for k,v in x.items():
             print k,v
+
+
+def test_collect_electricity():
+    import time
+    time.sleep(10)
+    collect_electricity()
 
 
 def main():
