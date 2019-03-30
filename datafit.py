@@ -32,6 +32,7 @@ For fast query speed, we need the help from concurrency.
 """
 
 import oracle2mysql
+from decimal import Decimal, ROUND_DOWN
 from logutil import logger
 
 
@@ -226,7 +227,10 @@ class FittingTool(object):
                 #     logger.error(err_msg)
                 #     raise Exception(err_msg)
                 try:
-                    fitted_val = FittingTool.fit_data(field_vals_not_none)
+                    fitted_val = FittingTool.fit_data_v2(field_vals_not_none)
+                    fit_msg = "Circuit id %s,  field: %s, fitted data: %s, raw data is %s. "\
+                              % (fitted_energy_data.mysql_equip_id, field, str(fitted_val), field_vals_not_none)
+                    logger.info(fit_msg)
                 except Exception as e:
                     err_msg = "Circuit id %s, error when fit its field %s history data . " \
                               "Data is %s. " \
@@ -237,6 +241,11 @@ class FittingTool(object):
             setattr(fitted_energy_data, field, fitted_val)
 
         return fitted_energy_data
+
+    @staticmethod
+    def fit_data_v2(data_list):
+        mean_val = sum(data_list)/len(data_list)
+        return Decimal(mean_val).quantize(Decimal('.01'), rounding=ROUND_DOWN)
 
     @staticmethod
     def fit_data(data_list):

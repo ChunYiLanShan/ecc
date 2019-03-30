@@ -30,6 +30,8 @@ def get_mysql_conn():
     user = os.environ['MYSQL_USER']
     password = os.environ['MYSQL_PASSWORD']
     db_name = os.environ['MYSQL_DATABASE']
+
+    logger.debug("connect to mysql database %s at host %s with user %s", db_name, host, user)
     return mysql.connector.connect(
         user=user,
         password=password,
@@ -44,8 +46,7 @@ class MySqlAdatper(object):
         self.db_conn = db_conn
 
     def get_all_equip_names(self):
-        
-        logger.debug("connect to mysql database %s at host %s with user %s", self.db_name, self.host, self.user)
+
 
         cursor = self.db_conn.cursor()
 

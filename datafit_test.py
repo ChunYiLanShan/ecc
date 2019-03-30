@@ -1,5 +1,7 @@
 # -*- coding: UTF-8 -*-
 import unittest
+from decimal import Decimal
+
 import datafit
 import oracle2mysql
 
@@ -375,6 +377,15 @@ class FitToolTest(unittest.TestCase):
         for k,v in kwargs.items():
             setattr(energy_data, k, v)
         return energy_data
+
+    def test_fit_data_v2(self):
+        hist_data = [3, 2, 1]
+        fit_data = datafit.FittingTool.fit_data_v2(hist_data)
+        self.assertEqual(Decimal(2.00), fit_data)
+
+        hist_data = [Decimal(3.01), Decimal(2.02), Decimal(1.019)]
+        fit_data = datafit.FittingTool.fit_data_v2(hist_data)
+        self.assertAlmostEqual(Decimal(2.01), fit_data)
 
     def test_fit_data(self):
         # Valid cases
