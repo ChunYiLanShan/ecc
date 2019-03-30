@@ -1,0 +1,1 @@
+mysql_equip_id, voltage_A, voltage_B, voltage_C, current_A, current_B, current_C, power, quantity
