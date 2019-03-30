@@ -728,7 +728,6 @@ def collect_electricity():
 
         logger.info("Equipments count: %s", len(indexes))
 
-        oracle_adapter = OracleAdapter()
         get_equip_engery_data_in_batch(oracle_adapter, equip_energy_data_list)
         fit_tool.fit_energy_data_when_no_update(equip_energy_data_list)
         mysqladapter.insert_energy_point_data_in_batch(equip_energy_data_list)
