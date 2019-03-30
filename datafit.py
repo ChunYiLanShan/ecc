@@ -119,7 +119,8 @@ class FittingTool(object):
         for equip_energy_data in equip_energy_data_list:
             for field in oracle2mysql.EquipEnergyData.FIELD_LIST:
                 if FittingTool.need_fit(equip_energy_data, self.hist_energy_data_dict, field):
-                    logger.debug("Try to fit field %s data for circuit id %s" % (field, equip_energy_data.mysql_equip_id))
+                    logger.info("Try to fit field %s data for circuit id %s"
+                                % (field, equip_energy_data.mysql_equip_id))
                     fitted_field_val = getattr(
                         self.fitted_energy_data_dict[equip_energy_data.mysql_equip_id],
                         field
@@ -153,7 +154,7 @@ class FittingTool(object):
         
         data_changed = (field_collected_val != field_latest_imported_val)
         if not data_changed:
-            logger.debug(
+            logger.info(
                 "Need fit data for field %s, field_collected_val = field_latest_imported_val = %s" %
                 (field_name, field_collected_val)
             )
