@@ -227,9 +227,15 @@ class FittingTool(object):
                 #     logger.error(err_msg)
                 #     raise Exception(err_msg)
                 try:
-                    fitted_val = FittingTool.fit_data_v2(field_vals_not_none)
-                    fit_msg = "Circuit id %s,  field: %s, fitted data: %s, raw data is %s. "\
-                              % (fitted_energy_data.mysql_equip_id, field, str(fitted_val), field_vals_not_none)
+                    is_descending = FittingTool.is_descending(field_vals_not_none)
+                    fitted_val = None
+                    if is_descending:
+                        fitted_val = FittingTool.fit_data(field_vals_not_none)
+                    else:
+                        fitted_val = FittingTool.fit_data_v2(field_vals_not_none)
+                    fit_msg = "Circuit id %s,  field: %s, fitted data: %s, is descending: %s, raw data is %s. "\
+                              % (fitted_energy_data.mysql_equip_id, field, str(fitted_val), is_descending,
+                                 field_vals_not_none)
                     logger.info(fit_msg)
                 except Exception as e:
                     err_msg = "Circuit id %s, error when fit its field %s history data . " \
@@ -246,6 +252,16 @@ class FittingTool(object):
     def fit_data_v2(data_list):
         mean_val = sum(data_list)/len(data_list)
         return Decimal(mean_val).quantize(Decimal('.01'), rounding=ROUND_DOWN)
+
+    @staticmethod
+    def is_descending(data_list):
+        if len(data_list) == 0 or len(data_list) == 1:
+            return True
+        for i in range(0, len(data_list)-1):
+            if data_list[i] < data_list[i+1]:
+                return False
+        return True
+
 
     @staticmethod
     def fit_data(data_list):
