@@ -289,7 +289,7 @@ class FittingTool(object):
             logger.error(err_msg)
             raise Exception(err_msg)
         fitted_data = data_list[0] + mean_delta
-        return fitted_data
+        return Decimal(fitted_data).quantize(Decimal('.01'), rounding=ROUND_DOWN)
 
 
 if __name__ == '__main__':

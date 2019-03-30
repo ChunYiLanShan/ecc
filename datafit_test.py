@@ -403,6 +403,9 @@ class FitToolTest(unittest.TestCase):
         self._fit_data_case(1, [1, 1])
         self._fit_data_case(1, [1])
 
+        fitted_data = datafit.FittingTool.fit_data([3.01, 2.06, 1.33])
+        self.assertAlmostEqual(Decimal(3.84), fitted_data)
+        
         # Exception case
         self._fit_data_exception_case(AssertionError, [])
         self._fit_data_exception_case(Exception, [20, 120, 100])
