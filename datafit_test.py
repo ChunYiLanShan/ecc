@@ -367,7 +367,7 @@ class FitToolTest(unittest.TestCase):
         ]
         for field in fields:
             self.assertEqual(4.0, getattr(fitted_data, field))
-        self.assertEqual(0.1, getattr(fitted_data, 'quantity'))
+        self.assertAlmostEqual(Decimal(1.03), getattr(fitted_data, 'quantity'))
         self.assertEqual(1, fitted_data.mysql_equip_id)
 
 
@@ -377,6 +377,15 @@ class FitToolTest(unittest.TestCase):
         for k,v in kwargs.items():
             setattr(energy_data, k, v)
         return energy_data
+
+    def test_is_descending(self):
+        hist_data = [Decimal(3.01), Decimal(2.02), Decimal(1.019)]
+        is_descending = datafit.FittingTool.is_descending(hist_data)
+        self.assertTrue(is_descending)
+
+        hist_data = [Decimal(3.01), Decimal(5.02), Decimal(1.019)]
+        is_descending = datafit.FittingTool.is_descending(hist_data)
+        self.assertFalse(is_descending)
 
     def test_fit_data_v2(self):
         hist_data = [3, 2, 1]
