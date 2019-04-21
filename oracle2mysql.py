@@ -156,6 +156,7 @@ class MySqlAdatper(object):
             new_row += "," + to_sql_repr(equip_energy_data.power)
             new_row += ",'" + to_sql_repr(datetime.now()) + "'"
             new_row += "," + to_sql_repr(equip_energy_data.mysql_equip_id)
+            new_row += "," + to_sql_repr(equip_energy_data.istrue)
             new_row += ")"
             values_list.append(new_row)
         values_sql = ",".join(values_list)
@@ -247,7 +248,9 @@ class EquipEnergyData(object):
         self.current_B = None
         self.current_C = None
         self.quantity = None
-        self.power = None 
+        self.power = None
+        # mock data:0,  real data: 1; default: 1
+        self.istrue = 1
 
         #mapping data
         self.point_id_to_type = {} 

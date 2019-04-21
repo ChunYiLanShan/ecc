@@ -130,6 +130,7 @@ class FittingTool(object):
                         field,
                         fitted_field_val
                     )
+                    equip_energy_data.istrue = 0
         logger.info("fit_energy_data_when_no_update completed.")
 
 
