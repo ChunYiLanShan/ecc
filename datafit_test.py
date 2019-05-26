@@ -370,7 +370,6 @@ class FitToolTest(unittest.TestCase):
         self.assertAlmostEqual(Decimal(1.03), getattr(fitted_data, 'quantity'))
         self.assertEqual(1, fitted_data.mysql_equip_id)
 
-
     @staticmethod
     def _create_enery_data(**kwargs):
         energy_data = oracle2mysql.EquipEnergyData()
@@ -396,6 +395,10 @@ class FitToolTest(unittest.TestCase):
         fit_data = datafit.FittingTool.fit_data_v2(hist_data)
         self.assertAlmostEqual(Decimal(2.01), fit_data)
 
+        hist_data = [Decimal(3.01), None, Decimal(2.02), None, Decimal(1.019)]
+        fit_data = datafit.FittingTool.fit_data_v2(hist_data)
+        self.assertAlmostEqual(Decimal(2.01), fit_data)
+
     def test_fit_data(self):
         # Valid cases
         self._fit_data_case(4, [3, 2, 1])
@@ -404,6 +407,9 @@ class FitToolTest(unittest.TestCase):
         self._fit_data_case(1, [1])
 
         fitted_data = datafit.FittingTool.fit_data([3.01, 2.06, 1.33])
+        self.assertAlmostEqual(Decimal(3.84), fitted_data)
+
+        fitted_data = datafit.FittingTool.fit_data([3.01, None, 2.06, None, 1.33])
         self.assertAlmostEqual(Decimal(3.84), fitted_data)
         
         # Exception case
@@ -419,3 +425,63 @@ class FitToolTest(unittest.TestCase):
             self._fit_data_case(-1, bad_hist_data)
         self.assertEqual(exception, type(context.exception))
 
+    def test_need_fit(self):
+
+        # Case need fit: new data 102.01 == latest imported 102.01
+        # prepare newly_collected_data
+        newly_collected_data = oracle2mysql.EquipEnergyData()
+        newly_collected_data.mysql_equip_id = 453
+        newly_collected_data.voltage_A = 102.01
+
+        field_name = 'voltage_A'
+
+        # prepare history data
+        hist_data_453_1 = oracle2mysql.EquipEnergyData()
+        hist_data_453_1.mysql_equip_id = 453
+        hist_data_453_1.voltage_A = 102.01
+
+        hist_data_453_2 = oracle2mysql.EquipEnergyData()
+        hist_data_453_2.mysql_equip_id = 453
+        hist_data_453_2.voltage_A = 103.01
+
+        hist_energy_data = {
+            453: [
+                hist_data_453_1,
+                hist_data_453_2
+            ]
+        }
+
+        is_need_fit = datafit.FittingTool.need_fit(newly_collected_data, hist_energy_data, field_name)
+        self.assertTrue(is_need_fit)
+
+        # Case need fit: new data None
+
+        # prepare history data
+        newly_collected_data = oracle2mysql.EquipEnergyData()
+        newly_collected_data.mysql_equip_id = 453
+        newly_collected_data.voltage_A = None
+
+        hist_data_453_1 = oracle2mysql.EquipEnergyData()
+        hist_data_453_1.mysql_equip_id = 453
+        hist_data_453_1.voltage_A = 102.01
+
+        hist_energy_data = {
+            453: [
+                hist_data_453_1
+            ]
+        }
+        is_need_fit = datafit.FittingTool.need_fit(newly_collected_data, hist_energy_data, field_name)
+        self.assertTrue(is_need_fit)
+
+        # Case: can't  data fit since there is no history data.
+
+        # prepare history data
+        newly_collected_data = oracle2mysql.EquipEnergyData()
+        newly_collected_data.mysql_equip_id = 453
+        newly_collected_data.voltage_A = None
+
+        hist_energy_data = {
+            453: []
+        }
+        is_need_fit = datafit.FittingTool.need_fit(newly_collected_data, hist_energy_data, field_name)
+        self.assertFalse(is_need_fit)

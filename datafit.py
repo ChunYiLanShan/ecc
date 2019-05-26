@@ -133,7 +133,6 @@ class FittingTool(object):
                     equip_energy_data.istrue = 0
         logger.info("fit_energy_data_when_no_update completed.")
 
-
     @staticmethod
     def need_fit(equip_energy_data, hist_energy_data_dict, field_name):
         """
@@ -145,9 +144,16 @@ class FittingTool(object):
         """
         circuit_id = equip_energy_data.mysql_equip_id
         if len(hist_energy_data_dict[circuit_id]) == 0:
+            logger.warn("There is no history data for %s. Can't do data fit." % circuit_id)
             return False
 
         field_collected_val = getattr(equip_energy_data, field_name)
+        none_collected = field_collected_val is None
+        if none_collected:
+            logger.warn("Circuit id: %s, field: %s, its value is None, which meaning can't collect from oracle."
+                        % (circuit_id, field_name))
+            return True
+
         field_latest_imported_val = getattr(
             hist_energy_data_dict[circuit_id][0],
             field_name
@@ -252,7 +258,8 @@ class FittingTool(object):
 
     @staticmethod
     def fit_data_v2(data_list):
-        mean_val = sum(data_list)/len(data_list)
+        data_list_without_none = [d for d in data_list if d is not None]
+        mean_val = sum(data_list_without_none)/len(data_list_without_none)
         return Decimal(mean_val).quantize(Decimal('.01'), rounding=ROUND_DOWN)
 
     @staticmethod
@@ -264,7 +271,6 @@ class FittingTool(object):
                 return False
         return True
 
-
     @staticmethod
     def fit_data(data_list):
         """
@@ -275,11 +281,12 @@ class FittingTool(object):
         :param data_list:
         :return:  = data_list[0] + mean(delta(data_list))
         """
-        assert len(data_list) > 0
-        if len(data_list) == 1:
-            return data_list[0]
+        data_list_without_none = [d for d in data_list if d is not None]
+        assert len(data_list_without_none) > 0
+        if len(data_list_without_none) == 1:
+            return data_list_without_none[0]
         # Compute the delta of adjacent elements, e.g.  [1, 3, 9, 10] => [(3-1), (9-3), (10-9)] => [2, 6, 1]
-        lst = data_list # use a short name: lst
+        lst = data_list_without_none # use a short name: lst
         delta = [
             lst[i]-lst[i+1]
             for i in range(0, len(lst) - 1)
@@ -287,7 +294,7 @@ class FittingTool(object):
 
         mean_delta = sum(delta)/len(delta)
         if mean_delta < 0:
-            err_msg = 'mean of delta is negative. Data values:%s ' % data_list
+            err_msg = 'mean of delta is negative. Data values:%s ' % lst
             logger.error(err_msg)
             raise Exception(err_msg)
         fitted_data = data_list[0] + mean_delta
